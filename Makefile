@@ -2,13 +2,13 @@
 # Copyright (c) 2025 Alex Goodkind (alex@goodkind.io)
 # License: Apache-2.0
 
-.PHONY: all clean test test-quick check-components help
+.PHONY: clean test test-quick check-components help
 
 # Output directory
 OUT_DIR = out
 
 
-# Default target: print help
+# Help is the interactive default
 .DEFAULT_GOAL := help
 
 # Template build target (runs build-template.sh)
@@ -145,9 +145,7 @@ clean:
 check-components:
 	@echo "Checking component files..."
 	@test -f templates/install-header.sh || (echo "✗ Missing templates/install-header.sh" && exit 1)
-	@test -f templates/extract-install-logic.awk || (echo "✗ Missing templates/extract-install-logic.awk" && exit 1)
 	@test -f templates/install-footer.sh || (echo "✗ Missing templates/install-footer.sh" && exit 1)
-	@test -f scripts/install-steps.sh || (echo "✗ Missing scripts/install-steps.sh" && exit 1)
 	@test -f scripts/install-elk.sh || (echo "✗ Missing scripts/install-elk.sh" && exit 1)
 	@test -f scripts/post-deploy.sh || (echo "✗ Missing scripts/post-deploy.sh" && exit 1)
 	@test -f scripts/rotate-api-keys.sh || (echo "✗ Missing scripts/rotate-api-keys.sh" && exit 1)

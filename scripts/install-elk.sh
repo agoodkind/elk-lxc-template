@@ -5,13 +5,17 @@
 #
 # ELK Stack Installation Script - Single Source of Truth
 #
-# This script installs and configures the full ELK Stack (Elasticsearch, Logstash, Kibana)
-# on Ubuntu 24.04. It works in two modes:
+# This script installs and configures the full ELK Stack
+# (Elasticsearch, Logstash, Kibana) on Ubuntu 24.04.
+# It works in two modes:
 #
-# 1. Standalone mode (build.sh): Self-contained with built-in logging
-# 2. Proxmox community script (out/install.sh): Uses framework's msg_* functions
+# 1. Standalone mode (build.sh): Self-contained with built-in
+#    logging
+# 2. Proxmox community script (out/install.sh): Uses framework's
+#    msg_* functions
 #
-# The shim pattern allows the same installation logic to work in both contexts.
+# The shim pattern allows the same installation logic to work
+# in both contexts.
 
 set -e
 
@@ -30,7 +34,8 @@ STEP=0
 # Proxmox framework will define LOG_FILE, standalone mode uses default
 LOG_FILE="${LOG_FILE:-/var/log/elk-install.log}"
 if [ ! -f "$LOG_FILE" ]; then
-    echo "$(date '+%Y-%m-%d %H:%M:%S') - Starting ELK Stack installation" | tee "$LOG_FILE"
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - \
+Starting ELK Stack installation" | tee "$LOG_FILE"
     echo "Installation log: $LOG_FILE" | tee -a "$LOG_FILE"
 fi
 
@@ -107,11 +112,14 @@ step_done "Updated repositories"
 # Install System Dependencies
 # ----------------------------------------------------------------------------
 step_start "Installing Dependencies"
-# Required: wget (download GPG key), gnupg (process GPG), apt-transport-https & ca-certificates (HTTPS repos)
-#           openjdk-11 (Java for ELK), curl (API calls), unzip & openssl (SSL cert management)
+# Required: wget (download GPG key), gnupg (process GPG),
+#   apt-transport-https & ca-certificates (HTTPS repos),
+#   openjdk-11 (Java for ELK), curl (API calls),
+#   unzip & openssl (SSL cert management)
 if ! apt-get install -y \
     wget gnupg apt-transport-https ca-certificates \
-    openjdk-11-jre-headless curl unzip openssl htop net-tools vim; then
+    openjdk-11-jre-headless curl unzip openssl \
+    htop net-tools vim; then
     echo "ERROR: Failed to install dependencies" | tee -a "$LOG_FILE"
     exit 1
 fi
@@ -126,7 +134,9 @@ wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | \
     gpg --dearmor -o /usr/share/keyrings/elasticsearch-keyring.gpg
 
 # Add Elastic 8.x repository
-echo "deb [signed-by=/usr/share/keyrings/elasticsearch-keyring.gpg] https://artifacts.elastic.co/packages/8.x/apt stable main" \
+echo "deb \
+[signed-by=/usr/share/keyrings/elasticsearch-keyring.gpg] \
+https://artifacts.elastic.co/packages/8.x/apt stable main" \
     > /etc/apt/sources.list.d/elastic-8.x.list
 step_done "Added Elastic Repository"
 
@@ -143,7 +153,8 @@ step_done "Updated Package Lists"
 # ----------------------------------------------------------------------------
 step_start "Installing ELK Stack (Elasticsearch, Logstash, Kibana)"
 # Log download information
-echo "$(date '+%Y-%m-%d %H:%M:%S') - Downloading ~2GB of packages, this will take 5-15 minutes depending on network speed" | tee -a "$LOG_FILE"
+echo "$(date '+%Y-%m-%d %H:%M:%S') - Downloading ~2GB, \
+takes 5-15 minutes depending on network speed" | tee -a "$LOG_FILE"
 # Install all three ELK components
 if ! apt-get install -y elasticsearch logstash kibana; then
     echo "ERROR: Failed to install ELK Stack packages" | tee -a "$LOG_FILE"
@@ -162,8 +173,10 @@ step_done "Prepared Elasticsearch Directories"
 # Deploy Elasticsearch Configuration
 # ----------------------------------------------------------------------------
 step_start "Deploying Elasticsearch Configuration"
-handle_config "elasticsearch.yml" "/etc/elasticsearch/elasticsearch.yml" "append"
-handle_config "elasticsearch.options" "/etc/elasticsearch/jvm.options.d/heap.options"
+handle_config "elasticsearch.yml" \
+    "/etc/elasticsearch/elasticsearch.yml" "append"
+handle_config "elasticsearch.options" \
+    "/etc/elasticsearch/jvm.options.d/heap.options"
 step_done "Deployed Elasticsearch Configuration"
 
 # ----------------------------------------------------------------------------
@@ -194,19 +207,21 @@ step_done "Deployed Kibana Configuration"
 # Generate Keystore Passwords
 # ----------------------------------------------------------------------------
 step_start "Generating Keystore Passwords"
-# Generate secure random password for Logstash keystore
+# Generate secure random password for Logstash keystore (required v8+)
 LOGSTASH_KEYSTORE_PASS=$(openssl rand -base64 32)
 
-# Set password in /etc/default/logstash for service and root interactive use
-echo "LOGSTASH_KEYSTORE_PASS=\"${LOGSTASH_KEYSTORE_PASS}\"" > /etc/default/logstash
+# Store in /etc/default/logstash for systemd service
+echo "LOGSTASH_KEYSTORE_PASS=\"${LOGSTASH_KEYSTORE_PASS}\"" \
+    > /etc/default/logstash
 chown root:root /etc/default/logstash
 chmod 0600 /etc/default/logstash
 
-# Set password in /root/.bashrc for interactive use
+# Add to root's environment for interactive sessions
 if ! grep -q "LOGSTASH_KEYSTORE_PASS" /root/.bashrc; then
     echo "" >> /root/.bashrc
     echo "# Logstash keystore password" >> /root/.bashrc
-    echo "export LOGSTASH_KEYSTORE_PASS=\"${LOGSTASH_KEYSTORE_PASS}\"" >> /root/.bashrc
+    echo "export LOGSTASH_KEYSTORE_PASS=\"\
+${LOGSTASH_KEYSTORE_PASS}\"" >> /root/.bashrc
 fi
 
 # Export for current session
@@ -218,8 +233,8 @@ step_done "Generated Keystore Passwords"
 # Initialize Keystores
 # ----------------------------------------------------------------------------
 step_start "Initializing Kibana Keystore"
-# Create Kibana keystore (for secure credential storage)
-# Remove existing keystore if present, then create new one
+# Create Kibana keystore for secure credential storage
+# Kibana keystore uses file permissions (0600) for security
 rm -f /etc/kibana/kibana.keystore
 export KBN_PATH_CONF=/etc/kibana
 /usr/share/kibana/bin/kibana-keystore create
@@ -228,10 +243,11 @@ chmod 0600 /etc/kibana/kibana.keystore
 step_done "Initialized Kibana Keystore"
 
 step_start "Initializing Logstash Keystore"
-# Create Logstash keystore with password from environment
-# Remove existing keystore if present, then create new one
+# Create Logstash keystore with password (required in v8+)
+# Password passed via LOGSTASH_KEYSTORE_PASS environment variable
 rm -f /etc/logstash/logstash.keystore
-/usr/share/logstash/bin/logstash-keystore --path.settings /etc/logstash create 
+/usr/share/logstash/bin/logstash-keystore \
+    --path.settings /etc/logstash create 
 chown logstash:root /etc/logstash/logstash.keystore
 chmod 0600 /etc/logstash/logstash.keystore
 step_done "Initialized Logstash Keystore"
@@ -251,8 +267,11 @@ msg_ok "Completed Successfully!\n"
 
 # Write final log message
 echo "" | tee -a "$LOG_FILE"
-echo "$(date '+%Y-%m-%d %H:%M:%S') - ELK Stack installation completed successfully" | tee -a "$LOG_FILE"
-echo "Installation log saved to: $LOG_FILE (inside container)" | tee -a "$LOG_FILE"
+echo "$(date '+%Y-%m-%d %H:%M:%S') - \
+ELK Stack installation completed successfully" \
+    | tee -a "$LOG_FILE"
+echo "Installation log saved to: $LOG_FILE (inside container)" \
+    | tee -a "$LOG_FILE"
 
 # Clean up temporary configuration files
 rm -rf /tmp/elk-config
