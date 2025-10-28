@@ -241,48 +241,42 @@ make check-components
 ```
 
 **Component Structure:**
+- `scripts/install-elk.sh` - **Single source of truth** for all installation logic
+- `build.sh` - Template builder, defines logging shims and calls install-elk.sh
 - `templates/install-header.sh` - Proxmox framework setup
-- `templates/extract-install-logic.awk` - AWK processor for install-steps.sh
 - `templates/install-footer.sh` - Final setup and output
-- `scripts/install-steps.sh` - Installation logic (source of truth)
 - `scripts/post-deploy.sh` - Security configuration script
 - `scripts/rotate-api-keys.sh` - API key rotation script
-- `config/` - Configuration files embedded via EMBED_FILE markers
+- `config/` - Configuration files embedded during build
   - `elasticsearch.yml` - Elasticsearch configuration
   - `kibana.yml` - Kibana configuration
   - `jvm.options.d/` - JVM heap settings
   - `logstash-pipelines/` - Logstash pipeline configurations
 - `tests/test-build.sh` - Comprehensive test suite (58 tests)
 
-**EMBED_FILE Markers:**
+**Single Source of Truth:**
 
-Scripts reference config files using markers:
-```bash
-# EMBED_FILE: config/file.yml -> /etc/service/file.yml          # Creates new file
-# EMBED_FILE_APPEND: config/file.yml -> /etc/service/file.yml   # Appends to file
-```
+`scripts/install-elk.sh` is the only installation script. It works in two modes:
 
-AWK processor reads config files and embeds during build.
+1. **Template build**: `build.sh` defines shims (`msg_info`, `msg_ok`, `handle_config`) with logging, then sources `install-elk.sh`
+2. **Community script**: Makefile wraps `install-elk.sh` with Proxmox framework and embeds config files inline
 
 **Why this approach?**
-- **Separation of concerns**: Config files separate from logic
-- **DRY principle**: Single source for configuration
-- **Easy maintenance**: Edit configs without touching scripts
-- **Automatic rebuild**: Makefile tracks config dependencies
-- **Two build modes**:
-  - Template build: `scripts/install-elk.sh` sources `install-steps.sh` directly
-  - Community script: Makefile processes `install-steps.sh` and embeds configs
-- Comprehensive test suite validates all components
+- **True single source**: All installation logic in one file (`install-elk.sh`)
+- **No duplication**: Same code runs in both deployment modes
+- **Shim pattern**: Caller defines environment-specific functions
+- **Easy maintenance**: Edit one file, both modes stay in sync
+- **Automatic rebuild**: Makefile tracks all dependencies
 
 ## Contributing
 
 Submit issues and pull requests on GitHub.
 
-**When modifying installation logic**, edit `scripts/install-steps.sh` and regenerate:
+**When modifying installation logic**, edit `scripts/install-elk.sh` and regenerate:
 ```bash
 make clean && make && make test
 ```
 
 **When modifying configurations**, edit files in `config/` directory - Makefile automatically rebuilds.
 
-Both the template build and community script will use updated logic and configs.
+Both the template build and community script use the same `install-elk.sh` logic.
