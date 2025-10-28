@@ -174,27 +174,49 @@ make
 # Clean generated files
 make clean
 
-# Test generated script
+# Run comprehensive test suite
 make test
+
+# Quick syntax validation
+make test-quick
+
+# Verify component files
+make check-components
 ```
 
 **Component Structure:**
 - `templates/install-header.sh` - Proxmox framework setup
-- `scripts/install-steps.sh` - **Installation logic (source of truth)**
-- `scripts/install-elk.sh` - Template build wrapper (sources install-steps.sh)
+- `templates/extract-install-logic.awk` - AWK processor for install-steps.sh
+- `templates/install-footer.sh` - Final setup and output
+- `scripts/install-steps.sh` - Installation logic (source of truth)
 - `scripts/post-deploy.sh` - Security configuration script
 - `scripts/rotate-api-keys.sh` - API key rotation script
-- `config/` - Configuration files (deprecated - now embedded in install-steps.sh)
-- `templates/install-footer.sh` - Final setup and output
+- `config/` - Configuration files embedded via EMBED_FILE markers
+  - `elasticsearch.yml` - Elasticsearch configuration
+  - `kibana.yml` - Kibana configuration
+  - `jvm.options.d/` - JVM heap settings
+  - `logstash-pipelines/` - Logstash pipeline configurations
+- `tests/test-build.sh` - Comprehensive test suite (58 tests)
+
+**EMBED_FILE Markers:**
+
+Scripts reference config files using markers:
+```bash
+# EMBED_FILE: config/file.yml -> /etc/service/file.yml          # Creates new file
+# EMBED_FILE_APPEND: config/file.yml -> /etc/service/file.yml   # Appends to file
+```
+
+AWK processor reads config files and embeds during build.
 
 **Why this approach?**
-- **Single source of truth**: `scripts/install-steps.sh` contains all installation commands
-- **DRY principle**: No duplicate code anywhere
-- **Easy maintenance**: Update one file, regenerate both outputs
+- **Separation of concerns**: Config files separate from logic
+- **DRY principle**: Single source for configuration
+- **Easy maintenance**: Edit configs without touching scripts
+- **Automatic rebuild**: Makefile tracks config dependencies
 - **Two build modes**:
   - Template build: `scripts/install-elk.sh` sources `install-steps.sh` directly
-  - Community script: Makefile parses `install-steps.sh` and wraps with Proxmox framework
-- Generated script is optimized for Proxmox framework
+  - Community script: Makefile processes `install-steps.sh` and embeds configs
+- Comprehensive test suite validates all components
 
 ## Contributing
 
@@ -202,7 +224,9 @@ Submit issues and pull requests on GitHub.
 
 **When modifying installation logic**, edit `scripts/install-steps.sh` and regenerate:
 ```bash
-make clean && make
+make clean && make && make test
 ```
 
-Both the template build and community script will use the updated logic.
+**When modifying configurations**, edit files in `config/` directory - Makefile automatically rebuilds.
+
+Both the template build and community script will use updated logic and configs.

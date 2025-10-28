@@ -17,43 +17,52 @@
 
 ### Submission Steps
 
-1. **Generate the install script**:
+1. **Run comprehensive test suite**:
    ```bash
    cd /path/to/elk-lxc-template
-   make clean && make
+   make clean && make && make test
    ```
 
-2. **Copy the generated script**:
+2. **Verify all tests pass** (58/58 tests):
+   - Component file validation
+   - Bash syntax validation
+   - AWK script validation
+   - Makefile target validation
+   - Generated script validation
+   - Structure validation
+   - Content validation
+
+3. **Copy the generated script**:
    ```bash
    cp out/install.sh /path/to/ProxmoxVE/ct/elk-stack.sh
    ```
 
-3. **Verify the copyright header** in `ct/elk-stack.sh`:
+4. **Verify the copyright header** in `ct/elk-stack.sh`:
    ```bash
    # Author: Alex Goodkind (agoodkind)
    ```
 
-3. **Test the script locally**:
+5. **Test the script locally**:
    ```bash
    # On your Proxmox host:
    bash -c "$(cat ct/elk-stack.sh)"
    ```
 
-4. **Verify installation**:
+6. **Verify installation**:
    - Container created successfully
    - ELK services running
    - Kibana accessible
    - Security configuration script works
    - API key rotation works
 
-5. **Create a pull request**:
+7. **Create a pull request**:
    ```bash
    git add ct/elk-stack.sh
    git commit -m "Add ELK Stack (Elasticsearch, Logstash, Kibana) installation script"
    git push origin main
    ```
 
-6. **Submit PR to upstream**:
+8. **Submit PR to upstream**:
    - Go to https://github.com/community-scripts/ProxmoxVE
    - Click "New Pull Request"
    - Select your fork and branch
