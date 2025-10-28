@@ -1,19 +1,28 @@
-msg_info "Starting ELK Services (without security)"
-echo "$(date '+%Y-%m-%d %H:%M:%S') - Starting Elasticsearch..." | tee -a /var/log/elk-install.log
-systemctl start elasticsearch
-echo "$(date '+%Y-%m-%d %H:%M:%S') - Waiting for Elasticsearch to initialize..." | tee -a /var/log/elk-install.log
-sleep 10
-echo "$(date '+%Y-%m-%d %H:%M:%S') - Starting Logstash and Kibana..." | tee -a /var/log/elk-install.log
-systemctl start logstash kibana
-echo "$(date '+%Y-%m-%d %H:%M:%S') - All services started" | tee -a /var/log/elk-install.log
-msg_ok "Started ELK Services"
+msg_info "Starting Elasticsearch"
+$STD systemctl start elasticsearch
+msg_ok "Started Elasticsearch"
 
-msg_ok "Completed Successfully!\n"
-echo -e "${CREATING}${GN}${APP} setup has been successfully initialized!${CL}"
-echo -e "${INFO}${YW} Services are running without security (no authentication)${CL}"
-echo -e "${INFO}${YW} To configure security (SSL, passwords, API keys):${CL}"
-echo -e "${TAB}${GATEWAY}${BGN}/root/elk-configure-security.sh${CL}"
-echo -e "${INFO}${YW} Access Kibana using the following URL:${CL}"
-echo -e "${TAB}${GATEWAY}${BGN}http://${IP}:5601${CL}"
-echo -e "${INFO}${YW} After security configuration, use the displayed credentials${CL}"
+msg_info "Waiting for Elasticsearch to initialize"
+sleep 10
+msg_ok "Elasticsearch Ready"
+
+msg_info "Starting Logstash and Kibana"
+$STD systemctl start logstash kibana
+msg_ok "Started Logstash and Kibana"
+
+motd_ssh
+customize
+
+msg_info "Cleaning up"
+$STD apt-get -y autoremove
+$STD apt-get -y autoclean
+msg_ok "Cleaned"
+
+msg_ok "${APP} setup has been successfully initialized!"
+msg_info "Services are running without security (no authentication)"
+msg_info "To configure security (SSL, passwords, API keys):"
+msg_info "  /root/elk-configure-security.sh"
+msg_info "Access Kibana using the following URL:"
+msg_info "  http://${IP}:5601"
+msg_info "After security configuration, use the displayed credentials"
 

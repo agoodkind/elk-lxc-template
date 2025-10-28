@@ -1,24 +1,25 @@
 #!/usr/bin/env bash
-PROXMOX_BUILD_URL="https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/misc/build.func"
-source <(curl -fsSL "$PROXMOX_BUILD_URL")
+
 # Copyright (c) 2025 Alex Goodkind
 # Author: Alex Goodkind (agoodkind)
 # License: Apache-2.0
-# Source: https://www.elastic.co/elk-stack
 
-APP="ELK-Stack"
-var_tags="${var_tags:-logging;elasticsearch;kibana;logstash}"
+source /dev/stdin <<<"$FUNCTIONS_FILE_PATH"
+color
+verb_ip6
+catch_errors
+setting_up_container
+network_check
+update_os
+
+APP="elk-stack"
+var_tags="${var_tags:-logging;elasticsearch;kibana;logstash;elk}"
 var_cpu="${var_cpu:-4}"
 var_ram="${var_ram:-8192}"
 var_disk="${var_disk:-32}"
 var_os="${var_os:-ubuntu}"
 var_version="${var_version:-24.04}"
 var_unprivileged="${var_unprivileged:-1}"
-
-header_info "$APP"
-variables
-color
-catch_errors
 
 function update_script() {
   header_info
@@ -40,10 +41,4 @@ function update_script() {
   msg_ok "Updated Successfully"
   exit
 }
-
-start
-build_container
-description
-
-msg_ok "Completed Successfully!\n"
 
