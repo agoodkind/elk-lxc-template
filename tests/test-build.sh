@@ -44,22 +44,16 @@ else
     test_fail "templates/install-header.sh missing"
 fi
 
-if [[ -f templates/extract-install-logic.awk ]]; then
-    test_pass "templates/extract-install-logic.awk exists"
-else
-    test_fail "templates/extract-install-logic.awk missing"
-fi
-
 if [[ -f templates/install-footer.sh ]]; then
     test_pass "templates/install-footer.sh exists"
 else
     test_fail "templates/install-footer.sh missing"
 fi
 
-if [[ -f scripts/install-steps.sh ]]; then
-    test_pass "scripts/install-steps.sh exists"
+if [[ -f scripts/install-elk.sh ]]; then
+    test_pass "scripts/install-elk.sh exists"
 else
-    test_fail "scripts/install-steps.sh missing"
+    test_fail "scripts/install-elk.sh missing"
 fi
 
 if [[ -f scripts/post-deploy.sh ]]; then
@@ -87,56 +81,48 @@ for script in templates/install-header.sh templates/install-footer.sh scripts/*.
     fi
 done
 
-test_header "AWK Script Validation"
+test_header "Installation Script Validation"
 
-# Test: AWK script syntax
-if awk -f templates/extract-install-logic.awk /dev/null 2>/dev/null; then
-    test_pass "AWK script syntax valid"
+# Test: install-elk.sh has proper structure
+if grep -q "^step_start" scripts/install-elk.sh; then
+    test_pass "install-elk.sh uses step_start function"
 else
-    test_fail "AWK script syntax error"
+    test_fail "install-elk.sh missing step_start function"
 fi
 
-# Test: AWK script processes STEP markers correctly
-STEP_COUNT=$(grep -c "^# STEP:" scripts/install-steps.sh || echo 0)
-AWK_OUTPUT=$(awk -f templates/extract-install-logic.awk scripts/install-steps.sh)
-MSG_INFO_COUNT=$(echo "$AWK_OUTPUT" | grep -c "^msg_info" || echo 0)
-MSG_OK_COUNT=$(echo "$AWK_OUTPUT" | grep -c "^msg_ok" || echo 0)
-
-if [[ $STEP_COUNT -eq $MSG_INFO_COUNT ]]; then
-    test_pass "AWK converts all STEP markers to msg_info ($STEP_COUNT steps)"
+if grep -q "^step_done" scripts/install-elk.sh; then
+    test_pass "install-elk.sh uses step_done function"
 else
-    test_fail "AWK STEP conversion mismatch (expected: $STEP_COUNT, got: $MSG_INFO_COUNT)"
+    test_fail "install-elk.sh missing step_done function"
 fi
 
-if [[ $STEP_COUNT -eq $MSG_OK_COUNT ]]; then
-    test_pass "AWK generates matching msg_ok calls ($STEP_COUNT closes)"
+# Test: Verify step_start and step_done are balanced
+STEP_START_COUNT=$(grep -c "^step_start" scripts/install-elk.sh || echo 0)
+STEP_DONE_COUNT=$(grep -c "^step_done" scripts/install-elk.sh || echo 0)
+
+if [[ $STEP_START_COUNT -eq $STEP_DONE_COUNT && $STEP_START_COUNT -gt 0 ]]; then
+    test_pass "step_start/step_done balanced ($STEP_START_COUNT steps)"
 else
-    test_fail "AWK msg_ok mismatch (expected: $STEP_COUNT, got: $MSG_OK_COUNT)"
+    test_fail "step_start/step_done mismatch (start: $STEP_START_COUNT, done: $STEP_DONE_COUNT)"
 fi
 
-# Test: AWK strips headers correctly
-if echo "$AWK_OUTPUT" | grep -q "^#!/"; then
-    test_fail "AWK failed to strip shebang"
+# Test: Install script has shim functions
+if grep -q "if ! command -v msg_info" scripts/install-elk.sh; then
+    test_pass "install-elk.sh has msg_info shim"
 else
-    test_pass "AWK strips shebang correctly"
+    test_fail "install-elk.sh missing msg_info shim"
 fi
 
-if echo "$AWK_OUTPUT" | grep -q "^# Copyright"; then
-    test_fail "AWK failed to strip copyright"
+if grep -q "if ! command -v msg_ok" scripts/install-elk.sh; then
+    test_pass "install-elk.sh has msg_ok shim"
 else
-    test_pass "AWK strips copyright headers correctly"
+    test_fail "install-elk.sh missing msg_ok shim"
 fi
 
-# Test: AWK prefixes apt-get commands
-if echo "$AWK_OUTPUT" | grep "^apt-get" >/dev/null 2>&1; then
-    test_fail "AWK failed to prefix apt-get commands"
+if grep -q "if ! command -v handle_config" scripts/install-elk.sh; then
+    test_pass "install-elk.sh has handle_config shim"
 else
-    if echo "$AWK_OUTPUT" | grep "^\$STD apt-get" >/dev/null 2>&1; then
-        test_pass "AWK prefixes apt-get with \$STD"
-    else
-        # No apt-get commands is also OK
-        test_pass "No apt-get commands to prefix"
-    fi
+    test_fail "install-elk.sh missing handle_config shim"
 fi
 
 test_header "Makefile Target Validation"
@@ -155,11 +141,11 @@ else
     test_fail "make check-components failed"
 fi
 
-# Test: Make all generates output
-if make all >/dev/null 2>&1; then
-    test_pass "make all generates install.sh"
+# Test: Make installer generates output
+if make installer >/dev/null 2>&1; then
+    test_pass "make installer generates install.sh"
 else
-    test_fail "make all failed"
+    test_fail "make installer failed"
 fi
 
 test_header "Generated Script Validation"
@@ -201,7 +187,8 @@ else
     test_fail "update_script function missing"
 fi
 
-if grep -q "source <(curl.*build.func)" out/install.sh; then
+if grep -q "build.func" out/install.sh && \
+   grep -q "source <(curl" out/install.sh; then
     test_pass "Proxmox build.func sourced"
 else
     test_fail "Proxmox build.func not sourced"
@@ -233,11 +220,16 @@ fi
 EXPECTED_STEPS=(
     "Installing Dependencies"
     "Adding Elastic Repository"
+    "Updating Package Lists"
     "Installing ELK Stack"
-    "Configuring Elasticsearch"
-    "Configuring Logstash"
-    "Configuring Kibana"
-    "Initializing Keystores"
+    "Preparing Elasticsearch Directories"
+    "Deploying Elasticsearch Configuration"
+    "Preparing Logstash Directories"
+    "Deploying Logstash Configuration"
+    "Deploying Kibana Configuration"
+    "Generating Keystore Passwords"
+    "Initializing Kibana Keystore"
+    "Initializing Logstash Keystore"
     "Enabling Services"
 )
 MISSING_STEPS=0

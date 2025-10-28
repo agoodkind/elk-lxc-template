@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-source <(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/misc/build.func)
+PROXMOX_BUILD_URL="https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/misc/build.func"
+source <(curl -fsSL "$PROXMOX_BUILD_URL")
 # Copyright (c) 2025 Alex Goodkind
 # Author: Alex Goodkind (agoodkind)
 # License: Apache-2.0
@@ -28,13 +29,13 @@ function update_script() {
     exit
   fi
   msg_info "Updating ${APP}"
-  $STD apt-get update
-  $STD apt-get -y upgrade elasticsearch logstash kibana
-  # Load Logstash keystore password before restart
+  # Load Logstash keystore password for service operations
   if [ -f /etc/default/logstash ]; then
     source /etc/default/logstash
     export LOGSTASH_KEYSTORE_PASS
   fi
+  $STD apt-get update
+  $STD apt-get -y upgrade elasticsearch logstash kibana
   $STD systemctl restart elasticsearch logstash kibana
   msg_ok "Updated Successfully"
   exit
