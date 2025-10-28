@@ -58,12 +58,14 @@ step_ok "Installing ELK Stack"
 
 step_info "Configuring Elasticsearch"
 log "Configuring Elasticsearch"
+mkdir -p /etc/elasticsearch/jvm.options.d
 cat /tmp/elk-config/elasticsearch.yml >> /etc/elasticsearch/elasticsearch.yml
 cat /tmp/elk-config/elasticsearch.options > /etc/elasticsearch/jvm.options.d/heap.options
 step_ok "Configuring Elasticsearch"
 
 step_info "Configuring Logstash"
 mkdir -p /etc/logstash/conf.d
+mkdir -p /etc/logstash/jvm.options.d
 cat /tmp/elk-config/00-input.conf > /etc/logstash/conf.d/00-input.conf
 cat /tmp/elk-config/30-output.conf > /etc/logstash/conf.d/30-output.conf
 cat /tmp/elk-config/logstash.options > /etc/logstash/jvm.options.d/heap.options
