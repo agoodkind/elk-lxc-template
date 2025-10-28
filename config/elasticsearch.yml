@@ -1,7 +1,14 @@
-network.host: 0.0.0.0
+
+# Elasticsearch network configuration
+# Prefer IPv6 and listen on all interfaces
+network.host: [_::, 0.0.0.0]
 http.port: 9200
+
+# Cluster and node settings
 cluster.name: elk-cluster
 node.name: ${HOSTNAME}
+
+# Disable security and SSL for demo/dev use
 xpack.security.enabled: false
 xpack.security.enrollment.enabled: false
 xpack.security.http.ssl.enabled: false
