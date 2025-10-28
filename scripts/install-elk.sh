@@ -185,14 +185,16 @@ step_done "Deployed Kibana Configuration"
 # ----------------------------------------------------------------------------
 step_start "Initializing Keystores"
 # Create Kibana keystore (for secure credential storage)
-# --force flag overwrites existing keystore without prompting
-# echo | provides empty input to avoid prompts
-echo | /usr/share/kibana/bin/kibana-keystore create --force
+# Remove existing keystore if present, then create new one
+rm -f /etc/kibana/kibana.keystore
+/usr/share/kibana/bin/kibana-keystore create
 chown kibana:kibana /etc/kibana/kibana.keystore
 chmod 660 /etc/kibana/kibana.keystore
 
 # Create Logstash keystore
-echo | /usr/share/logstash/bin/logstash-keystore create
+# Remove existing keystore if present, then create new one
+rm -f /etc/logstash/logstash.keystore
+/usr/share/logstash/bin/logstash-keystore create
 chown logstash:logstash /etc/logstash/logstash.keystore
 chmod 660 /etc/logstash/logstash.keystore
 step_done "Initialized Keystores"
