@@ -221,6 +221,7 @@ step_start "Initializing Kibana Keystore"
 # Create Kibana keystore (for secure credential storage)
 # Remove existing keystore if present, then create new one
 rm -f /etc/kibana/kibana.keystore
+export KBN_PATH_CONF=/etc/kibana
 /usr/share/kibana/bin/kibana-keystore create
 chown kibana:root /etc/kibana/kibana.keystore
 chmod 0600 /etc/kibana/kibana.keystore
