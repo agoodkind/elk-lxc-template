@@ -132,6 +132,16 @@ pct create $TEMPLATE_ID \
 # Start container and wait for boot
 pct start $TEMPLATE_ID && sleep 5
 
+# Ensure DNS is configured (fix common LXC DNS issues)
+echo "Configuring DNS in container..."
+pct exec $TEMPLATE_ID -- bash -c 'if ! grep -q "nameserver" /etc/resolv.conf 2>/dev/null || ! ping -c 1 -W 2 archive.ubuntu.com >/dev/null 2>&1; then
+    echo "nameserver 8.8.8.8" > /etc/resolv.conf
+    echo "nameserver 8.8.4.4" >> /etc/resolv.conf
+    echo "nameserver 1.1.1.1" >> /etc/resolv.conf
+    echo "DNS configured with Google and Cloudflare servers"
+fi'
+echo "✓ DNS verified"
+
 # Push scripts to container /tmp
 for f in scripts/*.sh; do
 	pct push $TEMPLATE_ID "$f" "/tmp/$(basename $f)" --perms 755
