@@ -153,7 +153,9 @@ done
 if [ "$UBUNTU_MIRROR" != "archive.ubuntu.com" ]; then
 	echo "Configuring faster Ubuntu mirror: $UBUNTU_MIRROR"
 	pct exec $TEMPLATE_ID -- sed -i "s|archive.ubuntu.com|$UBUNTU_MIRROR|g" /etc/apt/sources.list
-	echo "✓ Mirror configured"
+	echo "Updating package lists from new mirror..."
+	pct exec $TEMPLATE_ID -- apt-get update
+	echo "✓ Mirror configured and package lists updated"
 fi
 
 # Run install-elk.sh inside container

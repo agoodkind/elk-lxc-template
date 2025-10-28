@@ -97,9 +97,12 @@ fi
 # Install System Dependencies
 # ----------------------------------------------------------------------------
 step_start "Installing Dependencies"
-apt-get install -y \
+if ! apt-get install -y \
     curl wget gnupg apt-transport-https ca-certificates \
-    openjdk-11-jre-headless vim net-tools htop unzip openssl
+    openjdk-11-jre-headless vim net-tools htop unzip openssl; then
+    echo "ERROR: Failed to install dependencies" | tee -a "$LOG_FILE"
+    exit 1
+fi
 step_done "Installing Dependencies"
 
 # ----------------------------------------------------------------------------
@@ -130,7 +133,10 @@ step_start "Installing ELK Stack (Elasticsearch, Logstash, Kibana)"
 # Log download information
 echo "$(date '+%Y-%m-%d %H:%M:%S') - Downloading ~2GB of packages, this will take 5-15 minutes depending on network speed" | tee -a "$LOG_FILE"
 # Install all three ELK components
-apt-get install -y elasticsearch logstash kibana
+if ! apt-get install -y elasticsearch logstash kibana; then
+    echo "ERROR: Failed to install ELK Stack packages" | tee -a "$LOG_FILE"
+    exit 1
+fi
 step_done "Installing ELK Stack (Elasticsearch, Logstash, Kibana)"
 
 # ----------------------------------------------------------------------------
