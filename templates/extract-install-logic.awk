@@ -22,7 +22,7 @@ BEGIN {
 	next
 }
 
-# Handle EMBED_FILE markers
+# Handle EMBED_FILE markers (creates new file with >)
 /^# EMBED_FILE:/ {
 	# Extract source and destination from: # EMBED_FILE: source -> dest
 	line_text = $0
@@ -32,6 +32,28 @@ BEGIN {
 	dest = substr(line_text, arrow_pos + 4)
 	
 	print "cat > " dest " << 'ELKEOF'"
+	
+	# Read and output the source file
+	while ((getline file_line < source) > 0) {
+		print file_line
+	}
+	close(source)
+	
+	print "ELKEOF"
+	print ""
+	next
+}
+
+# Handle EMBED_FILE_APPEND markers (appends to existing file with >>)
+/^# EMBED_FILE_APPEND:/ {
+	# Extract source and destination from: # EMBED_FILE_APPEND: source -> dest
+	line_text = $0
+	sub(/^# EMBED_FILE_APPEND: /, "", line_text)
+	arrow_pos = index(line_text, " -> ")
+	source = substr(line_text, 1, arrow_pos - 1)
+	dest = substr(line_text, arrow_pos + 4)
+	
+	print "cat >> " dest " << 'ELKEOF'"
 	
 	# Read and output the source file
 	while ((getline file_line < source) > 0) {

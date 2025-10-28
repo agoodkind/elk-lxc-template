@@ -20,50 +20,18 @@ apt-get update
 apt-get install -y elasticsearch logstash kibana
 
 # STEP: Configuring Elasticsearch
-cat >> /etc/elasticsearch/elasticsearch.yml << 'ELKEOF'
-# Elasticsearch network configuration
-# Prefer IPv6 and listen on all interfaces
-network.host: [_::, 0.0.0.0]
-http.port: 9200
-
-# Cluster and node settings
-cluster.name: elk-cluster
-node.name: ${HOSTNAME}
-
-# Disable security and SSL for demo/dev use
-xpack.security.enabled: false
-xpack.security.enrollment.enabled: false
-xpack.security.http.ssl.enabled: false
-xpack.security.transport.ssl.enabled: false
-ELKEOF
-
-cat > /etc/elasticsearch/jvm.options.d/heap.options << 'ELKEOF'
-# JVM heap settings for Elasticsearch
--Xms2g
--Xmx2g
-ELKEOF
+# EMBED_FILE_APPEND: config/elasticsearch.yml -> /etc/elasticsearch/elasticsearch.yml
+# EMBED_FILE: config/jvm.options.d/elasticsearch.options -> /etc/elasticsearch/jvm.options.d/heap.options
 
 # STEP: Configuring Logstash
 mkdir -p /etc/logstash/conf.d
 
 # EMBED_FILE: config/logstash-pipelines/00-input.conf -> /etc/logstash/conf.d/00-input.conf
 # EMBED_FILE: config/logstash-pipelines/30-output.conf -> /etc/logstash/conf.d/30-output.conf
-
-cat > /etc/logstash/jvm.options.d/heap.options << 'ELKEOF'
-# JVM heap settings for Logstash
--Xms1g
--Xmx1g
-ELKEOF
+# EMBED_FILE: config/jvm.options.d/logstash.options -> /etc/logstash/jvm.options.d/heap.options
 
 # STEP: Configuring Kibana
-cat >> /etc/kibana/kibana.yml << 'ELKEOF'
-# Kibana server configuration
-server.port: 5601
-server.host: "::"
-
-# Elasticsearch connection
-elasticsearch.hosts: ["http://[::1]:9200"]
-ELKEOF
+# EMBED_FILE_APPEND: config/kibana.yml -> /etc/kibana/kibana.yml
 
 # STEP: Initializing Keystores
 /usr/share/kibana/bin/kibana-keystore create
