@@ -28,11 +28,11 @@ $(OUT_DIR):
 	@mkdir -p $(OUT_DIR)
 
 # Generate install.sh from component scripts
-$(OUT_DIR)/install.sh: $(OUT_DIR) templates/install-header.sh templates/extract-install-logic.awk scripts/install-steps.sh scripts/post-deploy.sh scripts/rotate-api-keys.sh templates/install-footer.sh config/elasticsearch.yml config/kibana.yml config/jvm.options.d/elasticsearch.options config/jvm.options.d/logstash.options config/logstash-pipelines/00-input.conf config/logstash-pipelines/30-output.conf
+$(OUT_DIR)/install.sh: $(OUT_DIR) templates/install-header.sh scripts/install-elk.sh scripts/post-deploy.sh scripts/rotate-api-keys.sh templates/install-footer.sh config/elasticsearch.yml config/kibana.yml config/jvm.options.d/elasticsearch.options config/jvm.options.d/logstash.options config/logstash-pipelines/00-input.conf config/logstash-pipelines/30-output.conf
 	@echo "Generating out/install.sh from component scripts..."
 	@cat templates/install-header.sh > $(OUT_DIR)/install.sh
 	@echo "" >> $(OUT_DIR)/install.sh
-	@$(MAKE) -s extract-install-logic >> $(OUT_DIR)/install.sh
+	@$(MAKE) -s embed-install-logic >> $(OUT_DIR)/install.sh
 	@echo "" >> $(OUT_DIR)/install.sh
 	@$(MAKE) -s embed-security-script >> $(OUT_DIR)/install.sh
 	@echo "" >> $(OUT_DIR)/install.sh
@@ -42,9 +42,54 @@ $(OUT_DIR)/install.sh: $(OUT_DIR) templates/install-header.sh templates/extract-
 	@chmod +x $(OUT_DIR)/install.sh
 	@echo "✓ Generated out/install.sh successfully"
 
-# Extract installation logic from scripts/install-steps.sh and adapt for Proxmox framework
-extract-install-logic:
-	@awk -f templates/extract-install-logic.awk scripts/install-steps.sh
+# Embed install-elk.sh with config file embedding
+embed-install-logic:
+	@echo "# Define config file handler for Proxmox framework"
+	@echo "handle_config() {"
+	@echo "    local source=\"\$$1\""
+	@echo "    local dest=\"\$$2\""
+	@echo "    local mode=\"\$${3:-overwrite}\""
+	@echo "    "
+	@echo "    case \"\$$source\" in"
+	@echo "        elasticsearch.yml)"
+	@echo "            if [ \"\$$mode\" = \"append\" ]; then"
+	@echo "                cat >> \"\$$dest\" << 'ELKEOF'"
+	@cat config/elasticsearch.yml
+	@echo "ELKEOF"
+	@echo "            fi"
+	@echo "            ;;"
+	@echo "        elasticsearch.options)"
+	@echo "            cat > \"\$$dest\" << 'ELKEOF'"
+	@cat config/jvm.options.d/elasticsearch.options
+	@echo "ELKEOF"
+	@echo "            ;;"
+	@echo "        00-input.conf)"
+	@echo "            cat > \"\$$dest\" << 'ELKEOF'"
+	@cat config/logstash-pipelines/00-input.conf
+	@echo "ELKEOF"
+	@echo "            ;;"
+	@echo "        30-output.conf)"
+	@echo "            cat > \"\$$dest\" << 'ELKEOF'"
+	@cat config/logstash-pipelines/30-output.conf
+	@echo "ELKEOF"
+	@echo "            ;;"
+	@echo "        logstash.options)"
+	@echo "            cat > \"\$$dest\" << 'ELKEOF'"
+	@cat config/jvm.options.d/logstash.options
+	@echo "ELKEOF"
+	@echo "            ;;"
+	@echo "        kibana.yml)"
+	@echo "            if [ \"\$$mode\" = \"append\" ]; then"
+	@echo "                cat >> \"\$$dest\" << 'ELKEOF'"
+	@cat config/kibana.yml
+	@echo "ELKEOF"
+	@echo "            fi"
+	@echo "            ;;"
+	@echo "    esac"
+	@echo "}"
+	@echo ""
+	@echo "# Source install-elk.sh (contains all installation logic)"
+	@cat scripts/install-elk.sh | grep -v "^#!/bin/bash" | grep -v "^# Copyright" | grep -v "^# Author" | grep -v "^# License" | tail -n +5
 
 # Embed security configuration script
 embed-security-script:

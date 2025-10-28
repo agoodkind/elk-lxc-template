@@ -156,7 +156,7 @@ if [ "$UBUNTU_MIRROR" != "archive.ubuntu.com" ]; then
 	echo "✓ Mirror configured"
 fi
 
-# Run install script inside container
+# Run install-elk.sh inside container
 echo "Starting ELK Stack installation in container $TEMPLATE_ID..."
 echo "Installation will take 10-20 minutes (downloading large packages)"
 echo ""
@@ -164,8 +164,8 @@ echo "To monitor in another terminal:"
 echo "  pct exec $TEMPLATE_ID -- tail -f /var/log/elk-install.log"
 echo ""
 
-# Run install and show progress
-if pct exec $TEMPLATE_ID -- /tmp/install-elk.sh; then
+# install-elk.sh already has built-in shims and logging
+if pct exec $TEMPLATE_ID -- /tmp/install-elk.sh 2>&1 | tee -a /var/log/proxmox-elk-build.log; then
     echo ""
     echo "============================================"
     echo "✓ Installation completed successfully"
