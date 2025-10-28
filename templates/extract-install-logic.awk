@@ -22,6 +22,28 @@ BEGIN {
 	next
 }
 
+# Handle EMBED_FILE markers
+/^# EMBED_FILE:/ {
+	# Extract source and destination from: # EMBED_FILE: source -> dest
+	line_text = $0
+	sub(/^# EMBED_FILE: /, "", line_text)
+	arrow_pos = index(line_text, " -> ")
+	source = substr(line_text, 1, arrow_pos - 1)
+	dest = substr(line_text, arrow_pos + 4)
+	
+	print "cat > " dest " << 'ELKEOF'"
+	
+	# Read and output the source file
+	while ((getline file_line < source) > 0) {
+		print file_line
+	}
+	close(source)
+	
+	print "ELKEOF"
+	print ""
+	next
+}
+
 # Skip header comments and blank lines
 /^#!/ || /^# Copyright/ || /^# Author/ || /^# License/ || /^#$/ || /^# Installation steps/ || /^# This file/ || /^# 1\./ || /^# 2\./ {
 	next

@@ -46,28 +46,8 @@ ELKEOF
 # STEP: Configuring Logstash
 mkdir -p /etc/logstash/conf.d
 
-cat > /etc/logstash/conf.d/00-input.conf << 'ELKEOF'
-# Logstash input configuration
-input {
-	beats {
-		port => 5044
-	}
-	tcp {
-		port => 5000
-		codec => json
-	}
-}
-ELKEOF
-
-cat > /etc/logstash/conf.d/30-output.conf << 'ELKEOF'
-# Logstash output configuration
-output {
-	elasticsearch {
-		hosts => ["http://[::1]:9200"]
-		index => "%{[@metadata][beat]}-%{[@metadata][version]}-%{+YYYY.MM.dd}"
-	}
-}
-ELKEOF
+# EMBED_FILE: config/logstash-pipelines/00-input.conf -> /etc/logstash/conf.d/00-input.conf
+# EMBED_FILE: config/logstash-pipelines/30-output.conf -> /etc/logstash/conf.d/30-output.conf
 
 cat > /etc/logstash/jvm.options.d/heap.options << 'ELKEOF'
 # JVM heap settings for Logstash
