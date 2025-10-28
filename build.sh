@@ -33,7 +33,7 @@
 set -e
 
 # Configurable variables
-TEMPLATE_ID=900
+TEMPLATE_ID=901
 TEMPLATE_NAME="elk-template"
 BASE_IMAGE="ubuntu-24.04-standard_24.04-2_amd64.tar.zst"
 CORES=4
