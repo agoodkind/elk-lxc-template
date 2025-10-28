@@ -1,5 +1,7 @@
-
 #!/bin/bash
+# Copyright (c) 2025 Alex Goodkind
+# Author: Alex Goodkind (agoodkind)
+# License: Apache-2.0
 
 # Stop ELK services if running
 systemctl stop elasticsearch logstash kibana 2>/dev/null || true
