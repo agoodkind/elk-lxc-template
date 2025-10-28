@@ -252,7 +252,7 @@ msg_ok "Completed Successfully!\n"
 # Write final log message
 echo "" | tee -a "$LOG_FILE"
 echo "$(date '+%Y-%m-%d %H:%M:%S') - ELK Stack installation completed successfully" | tee -a "$LOG_FILE"
-echo "Installation log saved to: $LOG_FILE" | tee -a "$LOG_FILE"
+echo "Installation log saved to: $LOG_FILE (inside container)" | tee -a "$LOG_FILE"
 
 # Clean up temporary configuration files
 rm -rf /tmp/elk-config
