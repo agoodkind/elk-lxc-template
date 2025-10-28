@@ -94,6 +94,16 @@ fi
 # ============================================================================
 
 # ----------------------------------------------------------------------------
+# Update repositories
+# ----------------------------------------------------------------------------
+step_start "Update repositories"
+if ! apt-get update; then
+    echo "ERROR: Failed to update repositories" | tee -a "$LOG_FILE"
+    exit 1
+fi
+step_done "Updated repositories"
+
+# ----------------------------------------------------------------------------
 # Install System Dependencies
 # ----------------------------------------------------------------------------
 step_start "Installing Dependencies"
@@ -101,7 +111,7 @@ step_start "Installing Dependencies"
 #           openjdk-11 (Java for ELK), curl (API calls), unzip & openssl (SSL cert management)
 if ! apt-get install -y \
     wget gnupg apt-transport-https ca-certificates \
-    openjdk-11-jre-headless curl unzip openssl htop net-tools vim then;
+    openjdk-11-jre-headless curl unzip openssl htop net-tools vim; then
     echo "ERROR: Failed to install dependencies" | tee -a "$LOG_FILE"
     exit 1
 fi
@@ -181,6 +191,30 @@ handle_config "kibana.yml" "/etc/kibana/kibana.yml" "append"
 step_done "Deployed Kibana Configuration"
 
 # ----------------------------------------------------------------------------
+# Generate Keystore Passwords
+# ----------------------------------------------------------------------------
+step_start "Generating Keystore Passwords"
+# Generate secure random password for Logstash keystore
+LOGSTASH_KEYSTORE_PASS=$(openssl rand -base64 32)
+
+# Set password in /etc/default/logstash for service and root interactive use
+echo "LOGSTASH_KEYSTORE_PASS=\"${LOGSTASH_KEYSTORE_PASS}\"" > /etc/default/logstash
+chown root:root /etc/default/logstash
+chmod 0600 /etc/default/logstash
+
+# Set password in /root/.bashrc for interactive use
+if ! grep -q "LOGSTASH_KEYSTORE_PASS" /root/.bashrc; then
+    echo "" >> /root/.bashrc
+    echo "# Logstash keystore password" >> /root/.bashrc
+    echo "export LOGSTASH_KEYSTORE_PASS=\"${LOGSTASH_KEYSTORE_PASS}\"" >> /root/.bashrc
+fi
+
+# Export for current session
+export LOGSTASH_KEYSTORE_PASS
+
+step_done "Generated Keystore Passwords"
+
+# ----------------------------------------------------------------------------
 # Initialize Keystores
 # ----------------------------------------------------------------------------
 step_start "Initializing Keystores"
@@ -188,15 +222,15 @@ step_start "Initializing Keystores"
 # Remove existing keystore if present, then create new one
 rm -f /etc/kibana/kibana.keystore
 /usr/share/kibana/bin/kibana-keystore create
-chown kibana:kibana /etc/kibana/kibana.keystore
-chmod 660 /etc/kibana/kibana.keystore
+chown kibana:root /etc/kibana/kibana.keystore
+chmod 0600 /etc/kibana/kibana.keystore
 
-# Create Logstash keystore
+# Create Logstash keystore with password from environment
 # Remove existing keystore if present, then create new one
 rm -f /etc/logstash/logstash.keystore
 /usr/share/logstash/bin/logstash-keystore create
-chown logstash:logstash /etc/logstash/logstash.keystore
-chmod 660 /etc/logstash/logstash.keystore
+chown logstash:root /etc/logstash/logstash.keystore
+chmod 0600 /etc/logstash/logstash.keystore
 step_done "Initialized Keystores"
 
 # ----------------------------------------------------------------------------

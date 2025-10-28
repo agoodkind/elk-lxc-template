@@ -33,7 +33,7 @@
 set -e
 
 # Configurable variables
-TEMPLATE_ID=901
+TEMPLATE_ID=900
 TEMPLATE_NAME="elk-template"
 BASE_IMAGE="ubuntu-24.04-standard_24.04-2_amd64.tar.zst"
 CORES=4
@@ -130,55 +130,55 @@ pct create $TEMPLATE_ID \
 	--features nesting=1
 
 # Start container and wait for boot
+echo "Starting container $TEMPLATE_ID... and waiting for boot"
 pct start $TEMPLATE_ID && sleep 5
 
-# Ensure DNS is configured (fix common LXC DNS issues)
-echo "Configuring DNS in container..."
-pct exec $TEMPLATE_ID -- bash -c 'if ! grep -q "nameserver" /etc/resolv.conf 2>/dev/null || ! ping -c 1 -W 2 archive.ubuntu.com >/dev/null 2>&1; then
-    echo "nameserver 8.8.8.8" > /etc/resolv.conf
-    echo "nameserver 8.8.4.4" >> /etc/resolv.conf
-    echo "nameserver 1.1.1.1" >> /etc/resolv.conf
-    echo "DNS configured with Google and Cloudflare servers"
-fi'
-echo "✓ DNS verified"
-
+echo ""
+echo "Pushing scripts to container /tmp"
 # Push scripts to container /tmp
 for f in scripts/*.sh; do
+	echo "  Pushing $f to /tmp/$(basename $f)..."
 	pct push $TEMPLATE_ID "$f" "/tmp/$(basename $f)" --perms 755
 done
 
+echo ""
+echo "Pushing post-deploy and management scripts to /root"
 # Push post-deploy and management scripts to /root
-pct push $TEMPLATE_ID scripts/post-deploy.sh /root/post-deploy.sh --perms 755
-pct push $TEMPLATE_ID scripts/rotate-api-keys.sh /root/rotate-api-keys.sh --perms 755
+for f in scripts/post-deploy.sh scripts/rotate-api-keys.sh; do
+	echo "  Pushing $f to /root/$(basename $f)..."
+	pct push $TEMPLATE_ID "$f" "/root/$(basename $f)" --perms 755
+done
 
 # Create config directory in container
+echo "Creating config directory in container /tmp/elk-config"
 pct exec $TEMPLATE_ID -- mkdir -p /tmp/elk-config
 
 # Push config files to container
 for f in config/*.yml config/logstash-pipelines/*.conf config/jvm.options.d/*.options; do
+	echo " Pushing $f to /tmp/elk-config/$(basename $f)..."
 	pct push $TEMPLATE_ID "$f" "/tmp/elk-config/$(basename $f)"
 done
 
-# Configure faster Ubuntu mirror if specified
-if [ "$UBUNTU_MIRROR" != "archive.ubuntu.com" ]; then
-	echo "Configuring faster Ubuntu mirror: $UBUNTU_MIRROR"
+# # Configure faster Ubuntu mirror if specified
+# if [ "$UBUNTU_MIRROR" != "archive.ubuntu.com" ]; then
+# 	echo "Configuring faster Ubuntu mirror: $UBUNTU_MIRROR"
 	
-	# Test DNS resolution first
-	if ! pct exec $TEMPLATE_ID -- ping -c 1 -W 2 "$UBUNTU_MIRROR" > /dev/null 2>&1; then
-		echo "Warning: Cannot resolve $UBUNTU_MIRROR - DNS may not be configured"
-		echo "Skipping mirror change, using default archive.ubuntu.com"
-	else
-		pct exec $TEMPLATE_ID -- sed -i "s|archive.ubuntu.com|$UBUNTU_MIRROR|g" /etc/apt/sources.list
-		echo "Updating package lists from new mirror..."
-		if pct exec $TEMPLATE_ID -- apt-get update; then
-			echo "✓ Mirror configured and package lists updated"
-		else
-			echo "Warning: Mirror update failed, reverting to default..."
-			pct exec $TEMPLATE_ID -- sed -i "s|$UBUNTU_MIRROR|archive.ubuntu.com|g" /etc/apt/sources.list
-			pct exec $TEMPLATE_ID -- apt-get update
-		fi
-	fi
-fi
+# 	# Test DNS resolution first
+# 	if ! pct exec $TEMPLATE_ID -- ping -c 1 -W 2 "$UBUNTU_MIRROR" > /dev/null 2>&1; then
+# 		echo "Warning: Cannot resolve $UBUNTU_MIRROR - DNS may not be configured"
+# 		echo "Skipping mirror change, using default archive.ubuntu.com"
+# 	else
+# 		pct exec $TEMPLATE_ID -- sed -i "s|archive.ubuntu.com|$UBUNTU_MIRROR|g" /etc/apt/sources.list
+# 		echo "Updating package lists from new mirror..."
+# 		if pct exec $TEMPLATE_ID -- apt-get update; then
+# 			echo "✓ Mirror configured and package lists updated"
+# 		else
+# 			echo "Warning: Mirror update failed, reverting to default..."
+# 			pct exec $TEMPLATE_ID -- sed -i "s|$UBUNTU_MIRROR|archive.ubuntu.com|g" /etc/apt/sources.list
+# 			pct exec $TEMPLATE_ID -- apt-get update
+# 		fi
+# 	fi
+# fi
 
 # Run install-elk.sh inside container
 echo "Starting ELK Stack installation in container $TEMPLATE_ID..."
@@ -213,12 +213,21 @@ echo "Running cleanup..."
 pct exec $TEMPLATE_ID -- /tmp/cleanup.sh
 
 # Stop container
+echo "Stopping container $TEMPLATE_ID..."
 pct stop $TEMPLATE_ID
 
 # Dump container to template
+echo "Dumping container $TEMPLATE_ID to template..."
 vzdump $TEMPLATE_ID --compress zstd --dumpdir /var/lib/vz/template/cache --mode stop
 
+if [ -f /var/lib/vz/template/cache/elk-stack-ubuntu-24.04.tar.zst ]; then
+	echo "Old template file found..."
+	echo "Removing old template file... /var/lib/vz/template/cache/elk-stack-ubuntu-24.04.tar.zst"
+	rm -f /var/lib/vz/template/cache/elk-stack-ubuntu-24.04.tar.zst
+fi
+
 # Rename template file
+echo "Renaming template file... $(ls -t vzdump-lxc-${TEMPLATE_ID}-*.tar.zst | head -1) to elk-stack-ubuntu-24.04.tar.zst"
 cd /var/lib/vz/template/cache && mv "$(ls -t vzdump-lxc-${TEMPLATE_ID}-*.tar.zst | head -1)" elk-stack-ubuntu-24.04.tar.zst
 
 # Output result
