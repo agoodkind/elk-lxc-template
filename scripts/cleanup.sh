@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Copyright (c) 2025 Alex Goodkind
 # Author: Alex Goodkind (agoodkind)
 # License: Apache-2.0
