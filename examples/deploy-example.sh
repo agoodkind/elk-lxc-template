@@ -1,5 +1,7 @@
-
 #!/bin/bash
+# Copyright (c) 2025 Alex Goodkind
+# Author: Alex Goodkind (agoodkind)
+# License: Apache-2.0
 
 # Usage: ./deploy-example.sh [CONTAINER_ID] [HOSTNAME] [IP_ADDRESS]
 # Defaults: CONTAINER_ID=300, HOSTNAME=elk-server, IP_ADDRESS=dhcp
@@ -15,6 +17,6 @@ else
 fi
 
 # Create and start container, then run post-deploy
-pct create $CONTAINER_ID local:vztmpl/elk-stack-ubuntu-22.04.tar.zst --arch amd64 --cores 4 --hostname $HOSTNAME --memory 8192 --net0 name=eth0,bridge=vmbr0,$IP_CONFIG --onboot 1 --rootfs local-lvm:32 --features nesting=1
+pct create $CONTAINER_ID local:vztmpl/elk-stack-ubuntu-24.04.tar.zst --arch amd64 --cores 4 --hostname $HOSTNAME --memory 8192 --net0 name=eth0,bridge=vmbr0,$IP_CONFIG --onboot 1 --rootfs local-lvm:32 --features nesting=1
 pct start $CONTAINER_ID && sleep 5
 pct exec $CONTAINER_ID -- /root/post-deploy.sh

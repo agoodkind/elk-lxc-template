@@ -1,3 +1,208 @@
 # ELK Stack LXC Template
-Run: chmod +x build.sh scripts/*.sh examples/*.sh && ./build.sh
-Deploy: ./examples/deploy-example.sh 300 elk-prod 192.168.1.100
+
+Automated installation of Elasticsearch, Logstash, and Kibana (ELK Stack) on Proxmox LXC containers.
+
+## Installation Methods
+
+### Method 1: Proxmox Community Script (Recommended)
+
+Use the single-file installer compatible with Proxmox community scripts:
+
+```bash
+bash -c "$(wget -qLO - https://raw.githubusercontent.com/YOUR_REPO/elk-lxc-template/main/out/install.sh)"
+```
+
+This will:
+- Create an LXC container with 4 CPU cores, 8GB RAM, 32GB disk
+- Install ELK Stack 8.x on Ubuntu 24.04
+- Configure all services
+- Start services without security (for initial testing)
+
+After installation, configure security:
+```bash
+pct exec CONTAINER_ID -- /root/elk-configure-security.sh
+```
+
+**Note**: `out/install.sh` is generated from component scripts. To regenerate:
+```bash
+make clean && make
+```
+
+### Method 2: Manual Template Build
+
+Build reusable template for multiple deployments:
+
+```bash
+chmod +x build.sh scripts/*.sh examples/*.sh && ./build.sh
+```
+
+Deploy container from template:
+```bash
+./examples/deploy-example.sh 300 elk-prod 192.168.1.100
+```
+
+## Configuration
+
+### Initial Setup (Method 1)
+
+After installation with community script:
+1. Access Kibana at `http://CONTAINER_IP:5601` (no authentication required initially)
+2. Run security configuration: `/root/elk-configure-security.sh`
+3. Choose SSL options when prompted
+4. Save displayed elastic password
+5. Access secured Kibana with credentials
+
+### Security Configuration
+
+The security script prompts for:
+- **Backend SSL**: Encrypts Elasticsearch communication
+- **Frontend SSL**: Enables HTTPS for Kibana web interface
+
+Features:
+- Generates auto-signed certificates using Elasticsearch certutil
+- Creates unique passwords per installation
+- Stores API keys in keystores (never plain text)
+- Password displayed once (not saved to disk)
+- Kibana uses service token or API key in keystore
+- Logstash uses API key with write-only permissions
+
+### Management Commands
+
+Rotate API keys:
+```bash
+/root/elk-rotate-api-keys.sh
+```
+
+Reset elastic password:
+```bash
+/usr/share/elasticsearch/bin/elasticsearch-reset-password -u elastic
+```
+
+Update ELK stack:
+```bash
+apt update && apt upgrade elasticsearch logstash kibana
+systemctl restart elasticsearch logstash kibana
+```
+
+## Container Specifications
+
+- **OS**: Ubuntu 24.04
+- **CPU**: 4 cores
+- **RAM**: 8GB
+- **Disk**: 32GB
+- **Network**: Bridge mode (dhcp or static IP)
+
+## Services
+
+- **Elasticsearch**: Port 9200 (HTTP API)
+- **Kibana**: Port 5601 (Web Interface)
+- **Logstash**: Port 5044 (Beats), Port 5000 (TCP JSON)
+
+## Architecture
+
+### Keystores
+- Kibana keystore: `/etc/kibana/kibana.keystore`
+- Logstash keystore: `/etc/logstash/logstash.keystore`
+- Permissions: 660, owned by service users
+
+### Certificates (if SSL enabled)
+- Elasticsearch certs: `/etc/elasticsearch/certs/`
+- Kibana certs: `/etc/kibana/certs/`
+- Logstash certs: `/etc/logstash/certs/`
+
+### Configuration Files
+- Elasticsearch: `/etc/elasticsearch/elasticsearch.yml`
+- Kibana: `/etc/kibana/kibana.yml`
+- Logstash pipelines: `/etc/logstash/conf.d/`
+- JVM options: `/etc/*/jvm.options.d/heap.options`
+
+## Default Resource Allocation
+
+- Elasticsearch heap: 2GB
+- Logstash heap: 1GB
+- Kibana: Remaining RAM
+
+Adjust in `/etc/*/jvm.options.d/heap.options` if needed.
+
+## Security Notes
+
+- Initial installation has no authentication (testing only)
+- Run security configuration before production use
+- All API keys stored in keystores (encrypted at rest)
+- No credentials in configuration files
+- Elastic password shown once during setup
+- Self-signed certificates suitable for internal use
+- For production, replace with CA-signed certificates
+
+## Troubleshooting
+
+Check service status:
+```bash
+systemctl status elasticsearch logstash kibana
+```
+
+View logs:
+```bash
+journalctl -u elasticsearch -f
+journalctl -u logstash -f
+journalctl -u kibana -f
+```
+
+Test Elasticsearch:
+```bash
+curl -k -u elastic:PASSWORD https://localhost:9200
+```
+
+List keystore contents:
+```bash
+/usr/share/kibana/bin/kibana-keystore list
+/usr/share/logstash/bin/logstash-keystore list
+```
+
+## License
+
+Apache License 2.0
+
+## Build System
+
+The `out/install.sh` file is generated from component scripts using Make:
+
+```bash
+# Generate install.sh
+make
+
+# Clean generated files
+make clean
+
+# Test generated script
+make test
+```
+
+**Component Structure:**
+- `templates/install-header.sh` - Proxmox framework setup
+- `scripts/install-steps.sh` - **Installation logic (source of truth)**
+- `scripts/install-elk.sh` - Template build wrapper (sources install-steps.sh)
+- `scripts/post-deploy.sh` - Security configuration script
+- `scripts/rotate-api-keys.sh` - API key rotation script
+- `config/` - Configuration files (deprecated - now embedded in install-steps.sh)
+- `templates/install-footer.sh` - Final setup and output
+
+**Why this approach?**
+- **Single source of truth**: `scripts/install-steps.sh` contains all installation commands
+- **DRY principle**: No duplicate code anywhere
+- **Easy maintenance**: Update one file, regenerate both outputs
+- **Two build modes**:
+  - Template build: `scripts/install-elk.sh` sources `install-steps.sh` directly
+  - Community script: Makefile parses `install-steps.sh` and wraps with Proxmox framework
+- Generated script is optimized for Proxmox framework
+
+## Contributing
+
+Submit issues and pull requests on GitHub.
+
+**When modifying installation logic**, edit `scripts/install-steps.sh` and regenerate:
+```bash
+make clean && make
+```
+
+Both the template build and community script will use the updated logic.

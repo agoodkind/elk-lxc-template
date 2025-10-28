@@ -1,1 +1,16 @@
-*.tar.zst
+# Generated files
+out/
+
+# Backup files
+*.bak
+*~
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db

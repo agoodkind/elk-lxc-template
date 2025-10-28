@@ -1,6 +1,8 @@
 #!/bin/bash
-
-# This script builds an LXC template for the ELK stack on Ubuntu 22.04
+# Copyright (c) 2025 Alex Goodkind
+# Author: Alex Goodkind (agoodkind)
+# License: Apache-2.0
+# This script builds an LXC template for the ELK stack on Ubuntu 24.04
 # It creates a container, installs and configures the ELK stack,
 # cleans up the container, and then exports it as a reusable template.
 
@@ -67,8 +69,9 @@ for f in scripts/*.sh; do
 	pct push $TEMPLATE_ID "$f" "/tmp/$(basename $f)" --perms 755
 done
 
-# Push post-deploy script to /root
+# Push post-deploy and management scripts to /root
 pct push $TEMPLATE_ID scripts/post-deploy.sh /root/post-deploy.sh --perms 755
+pct push $TEMPLATE_ID scripts/rotate-api-keys.sh /root/rotate-api-keys.sh --perms 755
 
 # Create config directory in container
 pct exec $TEMPLATE_ID -- mkdir -p /tmp/elk-config
@@ -88,7 +91,7 @@ pct stop $TEMPLATE_ID
 vzdump $TEMPLATE_ID --compress zstd --dumpdir /var/lib/vz/template/cache --mode stop
 
 # Rename template file
-cd /var/lib/vz/template/cache && mv "$(ls -t vzdump-lxc-${TEMPLATE_ID}-*.tar.zst | head -1)" elk-stack-ubuntu-22.04.tar.zst
+cd /var/lib/vz/template/cache && mv "$(ls -t vzdump-lxc-${TEMPLATE_ID}-*.tar.zst | head -1)" elk-stack-ubuntu-24.04.tar.zst
 
 # Output result
-echo "Template ready: /var/lib/vz/template/cache/elk-stack-ubuntu-22.04.tar.zst"
+echo "Template ready: /var/lib/vz/template/cache/elk-stack-ubuntu-24.04.tar.zst"
