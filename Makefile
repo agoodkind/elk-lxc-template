@@ -7,21 +7,31 @@
 # Output directory
 OUT_DIR = out
 
-# Default target
-all: $(OUT_DIR)/install.sh
 
+# Default target: print help
+.DEFAULT_GOAL := help
+
+# Template build target (runs build-template.sh)
+.PHONY: template
+template:
+	bash build-template.sh
+
+# Install target (runs scripts/install-elk.sh)
+.PHONY: installer
+installer: $(OUT_DIR)/install.sh
+
+# Default help target
 help:
 	@echo "ELK Stack LXC Template - Makefile"
 	@echo ""
 	@echo "Targets:"
-	@echo "  make               Generate Proxmox community script from components"
-	@echo "  make clean         Remove generated files"
-	@echo "  make test          Run comprehensive test suite"
-	@echo "  make test-quick    Quick syntax validation"
+	@echo "  make template        Build template (runs build-template.sh)"
+	@echo "  make installer       Build install script (out/install.sh)"
+	@echo "  make clean           Remove generated files"
+	@echo "  make test            Run comprehensive test suite"
+	@echo "  make test-quick      Quick syntax validation"
 	@echo "  make check-components  Verify all component files exist"
-	@echo "  make help          Show this help message"
-	@echo ""
-	@echo "Generated file: out/install.sh (do not edit directly)"
+	@echo "  make help            Show this help message"
 
 # Create output directory
 $(OUT_DIR):
