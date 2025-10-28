@@ -27,13 +27,34 @@ set -e
 # Configurable variables
 TEMPLATE_ID=900
 TEMPLATE_NAME="elk-template"
-BASE_IMAGE="ubuntu-24.04-standard_24.04-1_amd64.tar.zst"
+BASE_IMAGE="ubuntu-24.04-standard_24.04-2_amd64.tar.zst"
 CORES=4
 MEMORY=8192
 SWAP=4096
 DISK_SIZE=32
 STORAGE="local-lvm"
 TEMPLATE_STORAGE="local"
+
+# Auto-detect storage if defaults don't exist
+echo "Checking storage configuration..."
+if ! pvesm status | grep -q "^$STORAGE "; then
+    echo "Warning: Storage '$STORAGE' not found, detecting alternatives..."
+    # Try common storage names
+    for storage_name in storage local-lvm local-zfs local-btrfs; do
+        if pvesm status | grep -q "^$storage_name " && pvesm status | grep -q "^$storage_name .* active"; then
+            STORAGE=$storage_name
+            echo "✓ Using container storage: $STORAGE"
+            break
+        fi
+    done
+fi
+
+if ! pvesm status | grep -q "^$STORAGE "; then
+    echo "ERROR: No suitable storage found for containers"
+    echo "Available storage:"
+    pvesm status
+    exit 1
+fi
 
 # Require root
 if [[ $EUID -ne 0 ]]; then
@@ -54,9 +75,28 @@ if pct status $TEMPLATE_ID &>/dev/null; then
 fi
 
 # Download base image if not present
+echo "Checking for base image: $BASE_IMAGE"
 pveam update
+
 if ! pveam list $TEMPLATE_STORAGE | grep -q "$BASE_IMAGE"; then
-	pveam download $TEMPLATE_STORAGE $BASE_IMAGE
+	echo "Template not found locally, attempting download..."
+	
+	# Try to download the template
+	if ! pveam download $TEMPLATE_STORAGE $BASE_IMAGE; then
+		echo ""
+		echo "ERROR: Failed to download $BASE_IMAGE"
+		echo ""
+		echo "Available Ubuntu 24.04 templates:"
+		pveam available | grep "ubuntu-24.04"
+		echo ""
+		echo "Already downloaded templates:"
+		pveam list $TEMPLATE_STORAGE | grep ubuntu || echo "  (none)"
+		echo ""
+		echo "To use a different template, edit BASE_IMAGE in build.sh"
+		exit 1
+	fi
+else
+	echo "✓ Template $BASE_IMAGE already downloaded"
 fi
 
 # Set vm.max_map_count for Elasticsearch
