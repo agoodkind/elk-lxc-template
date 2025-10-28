@@ -50,6 +50,13 @@ chmod +x build.sh scripts/*.sh examples/*.sh
 
 # Run template builder (shows live installation progress)
 ./build.sh
+
+# If Ubuntu mirrors are slow, use a faster one:
+UBUNTU_MIRROR=mirrors.mit.edu ./build.sh
+
+# Other fast mirror options:
+# UBUNTU_MIRROR=mirror.math.princeton.edu ./build.sh
+# UBUNTU_MIRROR=mirror.us.leaseweb.net ./build.sh
 ```
 
 The build script will:

@@ -17,6 +17,14 @@
 #   Run as root on Proxmox host:
 #   ./build.sh
 #
+#   Use faster mirror (if default is slow):
+#   UBUNTU_MIRROR=mirrors.mit.edu ./build.sh
+#
+#   Other fast mirrors:
+#   - mirrors.mit.edu (MIT, US East Coast)
+#   - mirror.math.princeton.edu (Princeton, US East Coast)
+#   - mirror.us.leaseweb.net (LeaseWeb, Multiple US locations)
+#
 # Logs:
 #   - Host output: stdout/stderr
 #   - Container installation: /var/log/elk-install.log (inside container)
@@ -34,6 +42,10 @@ SWAP=4096
 DISK_SIZE=32
 STORAGE="local-lvm"
 TEMPLATE_STORAGE="local"
+
+# Ubuntu mirror (set to faster mirror if default is slow)
+# Options: archive.ubuntu.com (default), mirrors.mit.edu, mirror.math.princeton.edu, mirror.us.leaseweb.net
+UBUNTU_MIRROR="${UBUNTU_MIRROR:-archive.ubuntu.com}"
 
 # Auto-detect storage if defaults don't exist
 echo "Checking storage configuration..."
@@ -137,35 +149,30 @@ for f in config/*.yml config/logstash-pipelines/*.conf config/jvm.options.d/*.op
 	pct push $TEMPLATE_ID "$f" "/tmp/elk-config/$(basename $f)"
 done
 
-# Run install script inside container with log monitoring
+# Configure faster Ubuntu mirror if specified
+if [ "$UBUNTU_MIRROR" != "archive.ubuntu.com" ]; then
+	echo "Configuring faster Ubuntu mirror: $UBUNTU_MIRROR"
+	pct exec $TEMPLATE_ID -- sed -i "s|archive.ubuntu.com|$UBUNTU_MIRROR|g" /etc/apt/sources.list
+	echo "✓ Mirror configured"
+fi
+
+# Run install script inside container
 echo "Starting ELK Stack installation in container $TEMPLATE_ID..."
-echo "Monitor installation: pct exec $TEMPLATE_ID -- tail -f /var/log/elk-install.log"
+echo "Installation will take 10-20 minutes (downloading large packages)"
+echo ""
+echo "To monitor in another terminal:"
+echo "  pct exec $TEMPLATE_ID -- tail -f /var/log/elk-install.log"
 echo ""
 
-# Run install in background and monitor log
-pct exec $TEMPLATE_ID -- /tmp/install-elk.sh &
-INSTALL_PID=$!
-
-# Monitor log file while install runs
-sleep 3
-echo "Installation in progress (showing live log):"
-echo "============================================"
-pct exec $TEMPLATE_ID -- tail -f /var/log/elk-install.log &
-TAIL_PID=$!
-
-# Wait for install to complete
-wait $INSTALL_PID
-INSTALL_EXIT=$?
-
-# Stop log monitoring
-kill $TAIL_PID 2>/dev/null || true
-wait $TAIL_PID 2>/dev/null || true
-
-echo ""
-echo "============================================"
-if [ $INSTALL_EXIT -eq 0 ]; then
+# Run install and show progress
+if pct exec $TEMPLATE_ID -- /tmp/install-elk.sh; then
+    echo ""
+    echo "============================================"
     echo "✓ Installation completed successfully"
 else
+    INSTALL_EXIT=$?
+    echo ""
+    echo "============================================"
     echo "✗ Installation failed with exit code $INSTALL_EXIT"
     echo "Check log: pct exec $TEMPLATE_ID -- cat /var/log/elk-install.log"
     exit 1
