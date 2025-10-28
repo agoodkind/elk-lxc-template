@@ -221,13 +221,14 @@ fi
 
 # Rename template file
 
-if [ -f "$(ls -t vzdump-lxc-${TEMPLATE_ID}-*.tar.zst | head -1)" ]; then
-	echo "Renaming template file... \
-		$(ls -t vzdump-lxc-${TEMPLATE_ID}-*.tar.zst | head -1) \
-		to elk-stack-ubuntu-24.04.tar.zst"
-	cd /var/lib/vz/template/cache && \
-		mv "$(ls -t vzdump-lxc-${TEMPLATE_ID}-*.tar.zst 2>/dev/null | head -1)" \
-		elk-stack-ubuntu-24.04.tar.zst
+TEMPLATE_CACHE_DIR="/var/lib/vz/template/cache"
+TEMPLATE_SRC_FILE=$(ls -t $TEMPLATE_CACHE_DIR/vzdump-lxc-${TEMPLATE_ID}-*.tar.zst 2>/dev/null | head -1)
+if [ -n "$TEMPLATE_SRC_FILE" ] && [ -f "$TEMPLATE_SRC_FILE" ]; then
+	echo "Renaming template file... $(basename "$TEMPLATE_SRC_FILE") to elk-stack-ubuntu-24.04.tar.zst"
+	mv "$TEMPLATE_SRC_FILE" "$TEMPLATE_CACHE_DIR/elk-stack-ubuntu-24.04.tar.zst"
+else
+	echo "ERROR: Template file not found after dump"
+	exit 1
 fi
 
 # Output result
