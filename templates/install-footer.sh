@@ -1,7 +1,11 @@
 msg_info "Starting ELK Services (without security)"
+echo "$(date '+%Y-%m-%d %H:%M:%S') - Starting Elasticsearch..." | tee -a /var/log/elk-install.log
 systemctl start elasticsearch
+echo "$(date '+%Y-%m-%d %H:%M:%S') - Waiting for Elasticsearch to initialize..." | tee -a /var/log/elk-install.log
 sleep 10
+echo "$(date '+%Y-%m-%d %H:%M:%S') - Starting Logstash and Kibana..." | tee -a /var/log/elk-install.log
 systemctl start logstash kibana
+echo "$(date '+%Y-%m-%d %H:%M:%S') - All services started" | tee -a /var/log/elk-install.log
 msg_ok "Started ELK Services"
 
 msg_ok "Completed Successfully!\n"

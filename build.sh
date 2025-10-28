@@ -2,9 +2,25 @@
 # Copyright (c) 2025 Alex Goodkind
 # Author: Alex Goodkind (agoodkind)
 # License: Apache-2.0
-# This script builds an LXC template for the ELK stack on Ubuntu 24.04
-# It creates a container, installs and configures the ELK stack,
-# cleans up the container, and then exports it as a reusable template.
+#
+# ELK Stack LXC Template Builder
+# 
+# ENTRYPOINT: Run this script on a Proxmox host to build the ELK template
+# 
+# This script:
+# 1. Creates a new LXC container from Ubuntu 24.04 base image
+# 2. Installs and configures the ELK stack inside the container
+# 3. Cleans up the container to prepare it as a template
+# 4. Exports it as a reusable LXC template
+#
+# Usage:
+#   Run as root on Proxmox host:
+#   ./build.sh
+#
+# Logs:
+#   - Host output: stdout/stderr
+#   - Container installation: /var/log/elk-install.log (inside container)
+#   - Monitor live: pct exec <ID> -- tail -f /var/log/elk-install.log
 
 set -e
 
@@ -81,8 +97,44 @@ for f in config/*.yml config/logstash-pipelines/*.conf config/jvm.options.d/*.op
 	pct push $TEMPLATE_ID "$f" "/tmp/elk-config/$(basename $f)"
 done
 
-# Run install and cleanup scripts inside container
-pct exec $TEMPLATE_ID -- /tmp/install-elk.sh && pct exec $TEMPLATE_ID -- /tmp/cleanup.sh
+# Run install script inside container with log monitoring
+echo "Starting ELK Stack installation in container $TEMPLATE_ID..."
+echo "Monitor installation: pct exec $TEMPLATE_ID -- tail -f /var/log/elk-install.log"
+echo ""
+
+# Run install in background and monitor log
+pct exec $TEMPLATE_ID -- /tmp/install-elk.sh &
+INSTALL_PID=$!
+
+# Monitor log file while install runs
+sleep 3
+echo "Installation in progress (showing live log):"
+echo "============================================"
+pct exec $TEMPLATE_ID -- tail -f /var/log/elk-install.log &
+TAIL_PID=$!
+
+# Wait for install to complete
+wait $INSTALL_PID
+INSTALL_EXIT=$?
+
+# Stop log monitoring
+kill $TAIL_PID 2>/dev/null || true
+wait $TAIL_PID 2>/dev/null || true
+
+echo ""
+echo "============================================"
+if [ $INSTALL_EXIT -eq 0 ]; then
+    echo "✓ Installation completed successfully"
+else
+    echo "✗ Installation failed with exit code $INSTALL_EXIT"
+    echo "Check log: pct exec $TEMPLATE_ID -- cat /var/log/elk-install.log"
+    exit 1
+fi
+
+# Run cleanup script
+echo ""
+echo "Running cleanup..."
+pct exec $TEMPLATE_ID -- /tmp/cleanup.sh
 
 # Stop container
 pct stop $TEMPLATE_ID

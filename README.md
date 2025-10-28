@@ -25,6 +25,13 @@ This will:
 - Install ELK Stack 8.x on Ubuntu 24.04
 - Configure all services
 - Start services without security (for initial testing)
+- Log all installation steps to `/var/log/elk-install.log` inside container
+
+Monitor installation progress:
+```bash
+# View installation log in real-time
+pct exec CONTAINER_ID -- tail -f /var/log/elk-install.log
+```
 
 After installation, configure security:
 ```bash
@@ -33,11 +40,24 @@ pct exec CONTAINER_ID -- /root/elk-configure-security.sh
 
 ### Method 2: Manual Template Build
 
+**Entrypoint**: `build.sh` - Run on Proxmox host as root
+
 Build reusable template for multiple deployments:
 
 ```bash
-chmod +x build.sh scripts/*.sh examples/*.sh && ./build.sh
+# Make scripts executable
+chmod +x build.sh scripts/*.sh examples/*.sh
+
+# Run template builder (shows live installation progress)
+./build.sh
 ```
+
+The build script will:
+- Create a temporary LXC container (ID 900)
+- Install and configure ELK Stack with full logging
+- Display live installation progress from `/var/log/elk-install.log`
+- Clean up and export as reusable template
+- Save to `/var/lib/vz/template/cache/elk-stack-ubuntu-24.04.tar.zst`
 
 Deploy container from template:
 ```bash
@@ -139,22 +159,48 @@ Adjust in `/etc/*/jvm.options.d/heap.options` if needed.
 
 ## Troubleshooting
 
+### Installation Logs
+
+Both deployment methods log to `/var/log/elk-install.log` inside the container:
+
+```bash
+# View installation log
+pct exec CONTAINER_ID -- cat /var/log/elk-install.log
+
+# Monitor installation in real-time
+pct exec CONTAINER_ID -- tail -f /var/log/elk-install.log
+
+# Check for errors during installation
+pct exec CONTAINER_ID -- grep -i error /var/log/elk-install.log
+```
+
+### Service Status
+
 Check service status:
 ```bash
 systemctl status elasticsearch logstash kibana
 ```
 
-View logs:
+View service logs:
 ```bash
 journalctl -u elasticsearch -f
 journalctl -u logstash -f
 journalctl -u kibana -f
 ```
 
+### Connectivity Tests
+
 Test Elasticsearch:
 ```bash
 curl -k -u elastic:PASSWORD https://localhost:9200
 ```
+
+Test Kibana:
+```bash
+curl http://localhost:5601/api/status
+```
+
+### Keystore Management
 
 List keystore contents:
 ```bash

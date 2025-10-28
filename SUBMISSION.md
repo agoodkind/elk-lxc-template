@@ -204,7 +204,7 @@ If not submitting to community scripts, users must build first:
 git clone https://github.com/agoodkind/elk-lxc-template.git
 cd elk-lxc-template
 make clean && make
-bash out/install.sh
+out/install.sh
 ```
 
 ## Maintenance

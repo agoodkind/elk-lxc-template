@@ -8,6 +8,39 @@
 BEGIN { 
 	in_step = 0
 	step_name = ""
+	log_file = ""
+	log_initialized = 0
+}
+
+# Handle LOG_INIT marker to create log file
+/^# LOG_INIT:/ {
+	log_file = substr($0, 13)
+	gsub(/^[ \t]+|[ \t]+$/, "", log_file)
+	print "echo \"$(date '+%Y-%m-%d %H:%M:%S') - Starting ELK Stack installation\" | tee " log_file
+	print "echo \"Installation log: " log_file "\" | tee -a " log_file
+	print ""
+	log_initialized = 1
+	next
+}
+
+# Handle LOG markers for timestamped logging
+/^# LOG:/ {
+	if (log_initialized) {
+		log_msg = substr($0, 8)
+		print "echo \"$(date '+%Y-%m-%d %H:%M:%S') - " log_msg "\" | tee -a " log_file
+	}
+	next
+}
+
+# Handle VERBOSE_APT marker for verbose apt installations
+/^# VERBOSE_APT:/ {
+	cmd = substr($0, 16)
+	if (log_initialized) {
+		print cmd " 2>&1 | tee -a " log_file
+	} else {
+		print "$STD " cmd
+	}
+	next
 }
 
 # Match STEP markers and generate msg_info/msg_ok calls
