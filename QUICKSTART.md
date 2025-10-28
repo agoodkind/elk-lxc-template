@@ -13,6 +13,7 @@ Single-file installer compatible with Proxmox community scripts framework.
 ### Build and Installation
 
 1. **Build the installer**:
+
 ```bash
 git clone https://github.com/agoodkind/elk-lxc-template.git
 cd elk-lxc-template
@@ -20,6 +21,7 @@ make clean && make
 ```
 
 2. **Run the installer**:
+
 ```bash
 bash out/install.sh
 ```
@@ -37,15 +39,17 @@ bash out/install.sh
 ### Post-Installation Steps
 
 1. **Access Initial Installation** (no authentication):
+
    ```
    http://CONTAINER_IP:5601
    ```
 
 2. **Configure Security**:
+
    ```bash
    pct exec CONTAINER_ID -- /root/elk-configure-security.sh
    ```
-   
+
    This will:
    - Prompt for SSL options (backend and frontend)
    - Generate certificates
@@ -54,6 +58,7 @@ bash out/install.sh
    - Display elastic password (save it!)
 
 3. **Access Secured Installation**:
+
    ```
    http://CONTAINER_IP:5601  (or https if frontend SSL enabled)
    Username: elastic
@@ -94,12 +99,14 @@ elk-lxc-template/
 ### Two Installation Methods
 
 #### Method 1: Community Script (Recommended for Proxmox)
+
 - Single command installation
 - Uses Proxmox framework
 - Perfect for community script submission
 - File: `install.sh`
 
 #### Method 2: Template Build (Optional for multiple deployments)
+
 - Build once, deploy many times
 - Good for organizations deploying multiple ELK instances
 - Files: `build.sh`, `scripts/`, `config/`, `examples/`
@@ -107,18 +114,21 @@ elk-lxc-template/
 ### Key Features
 
 ✅ **Security First**
+
 - No credentials in plain text
 - Keystores for API keys
 - SSL/TLS support
 - Unique passwords per installation
 
 ✅ **Easy Management**
+
 - Update function included
 - API key rotation script
 - Service management commands
 - Clear documentation
 
 ✅ **Production Ready**
+
 - Proper resource allocation
 - Service isolation
 - Tested configurations
@@ -143,6 +153,7 @@ bash -c "$(wget -qLO - URL_TO_SCRIPT)" -s --update
 ```
 
 Or manually:
+
 ```bash
 apt update && apt upgrade elasticsearch logstash kibana
 systemctl restart elasticsearch logstash kibana
@@ -151,12 +162,14 @@ systemctl restart elasticsearch logstash kibana
 ### Troubleshooting
 
 **Services not starting?**
+
 ```bash
 systemctl status elasticsearch logstash kibana
 journalctl -u elasticsearch -f
 ```
 
 **Can't connect to Elasticsearch?**
+
 ```bash
 curl http://localhost:9200
 # Or with SSL:
@@ -164,6 +177,7 @@ curl -k -u elastic:PASSWORD https://localhost:9200
 ```
 
 **Forgot password?**
+
 ```bash
 /usr/share/elasticsearch/bin/elasticsearch-reset-password -u elastic
 ```
@@ -177,11 +191,10 @@ curl -k -u elastic:PASSWORD https://localhost:9200
 
 ### Support
 
-- Issues: https://github.com/agoodkind/elk-lxc-template/issues
-- Docs: https://github.com/agoodkind/elk-lxc-template
-- ELK Docs: https://www.elastic.co/guide/
+- Issues: <https://github.com/agoodkind/elk-lxc-template/issues>
+- Docs: <https://github.com/agoodkind/elk-lxc-template>
+- ELK Docs: <https://www.elastic.co/guide/>
 
 ### License
 
 Apache License 2.0 - Free to use and modify
-
