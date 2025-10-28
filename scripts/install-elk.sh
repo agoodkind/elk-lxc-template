@@ -55,7 +55,7 @@ step_ok "Adding Elastic Repository"
 
 step_info "Installing ELK Stack (Elasticsearch, Logstash, Kibana)"
 log "Downloading ELK packages (this may take several minutes)"
-echo "  (Downloading ~500MB of packages - check log for details)"
+echo "  (Downloading ~2GB of packages - check log for details)"
 apt-get install -y elasticsearch logstash kibana >> "$LOG_FILE" 2>&1
 log "ELK Stack packages installed"
 step_ok "Installing ELK Stack"
@@ -81,11 +81,11 @@ step_ok "Configuring Kibana"
 
 step_info "Initializing Keystores"
 log "Initializing keystores"
-/usr/share/kibana/bin/kibana-keystore create >> "$LOG_FILE" 2>&1
+echo | /usr/share/kibana/bin/kibana-keystore create --force >> "$LOG_FILE" 2>&1
 chown kibana:kibana /etc/kibana/kibana.keystore
 chmod 660 /etc/kibana/kibana.keystore
 
-/usr/share/logstash/bin/logstash-keystore create >> "$LOG_FILE" 2>&1
+echo | /usr/share/logstash/bin/logstash-keystore create >> "$LOG_FILE" 2>&1
 chown logstash:logstash /etc/logstash/logstash.keystore
 chmod 660 /etc/logstash/logstash.keystore
 step_ok "Initializing Keystores"
