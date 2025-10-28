@@ -54,21 +54,30 @@ bash -c "$(wget -qLO - https://raw.githubusercontent.com/agoodkind/elk-lxc-templ
 
 ```
 elk-lxc-template/
-├── install.sh              # Proxmox community script (main file)
-├── README.md               # User documentation
-├── SUBMISSION.md           # Guide for submitting to Proxmox community
+├── out/install.sh         # Generated Proxmox community script (main file)
+├── README.md              # User documentation
+├── SUBMISSION.md          # Guide for submitting to Proxmox community
 ├── QUICKSTART.md          # This file
-├── build.sh               # (Optional) Template builder for multiple deployments
-├── scripts/               # (Optional) Individual scripts for template method
+├── Makefile               # Build system
+├── build.sh               # Template builder for multiple deployments
+├── templates/             # Build templates
+│   ├── install-header.sh
+│   ├── install-footer.sh
+│   └── extract-install-logic.awk
+├── scripts/               # Installation scripts
+│   ├── install-steps.sh   # Installation logic (source of truth)
 │   ├── install-elk.sh
 │   ├── post-deploy.sh
 │   ├── cleanup.sh
 │   └── rotate-api-keys.sh
-├── config/                # (Optional) Config files for template method
+├── config/                # Configuration files
 │   ├── elasticsearch.yml
 │   ├── kibana.yml
+│   ├── jvm.options.d/
 │   └── logstash-pipelines/
-└── examples/              # (Optional) Deployment examples for template method
+├── tests/                 # Test suite
+│   └── test-build.sh
+└── examples/              # Deployment examples
     └── deploy-example.sh
 ```
 
