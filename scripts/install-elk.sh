@@ -101,7 +101,7 @@ step_start "Installing Dependencies"
 #           openjdk-11 (Java for ELK), curl (API calls), unzip & openssl (SSL cert management)
 if ! apt-get install -y \
     wget gnupg apt-transport-https ca-certificates \
-    openjdk-11-jre-headless curl unzip openssl; then
+    openjdk-11-jre-headless curl unzip openssl htop net-tools vim then;
     echo "ERROR: Failed to install dependencies" | tee -a "$LOG_FILE"
     exit 1
 fi
