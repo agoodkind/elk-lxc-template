@@ -150,6 +150,7 @@ for f in scripts/post-deploy.sh scripts/rotate-api-keys.sh; do
 done
 
 # Create config directory in container
+echo ""
 echo "Creating config directory in container /tmp/elk-config"
 pct exec $TEMPLATE_ID -- mkdir -p /tmp/elk-config
 
@@ -159,28 +160,8 @@ for f in config/*.yml config/logstash-pipelines/*.conf config/jvm.options.d/*.op
 	pct push $TEMPLATE_ID "$f" "/tmp/elk-config/$(basename $f)"
 done
 
-# # Configure faster Ubuntu mirror if specified
-# if [ "$UBUNTU_MIRROR" != "archive.ubuntu.com" ]; then
-# 	echo "Configuring faster Ubuntu mirror: $UBUNTU_MIRROR"
-	
-# 	# Test DNS resolution first
-# 	if ! pct exec $TEMPLATE_ID -- ping -c 1 -W 2 "$UBUNTU_MIRROR" > /dev/null 2>&1; then
-# 		echo "Warning: Cannot resolve $UBUNTU_MIRROR - DNS may not be configured"
-# 		echo "Skipping mirror change, using default archive.ubuntu.com"
-# 	else
-# 		pct exec $TEMPLATE_ID -- sed -i "s|archive.ubuntu.com|$UBUNTU_MIRROR|g" /etc/apt/sources.list
-# 		echo "Updating package lists from new mirror..."
-# 		if pct exec $TEMPLATE_ID -- apt-get update; then
-# 			echo "✓ Mirror configured and package lists updated"
-# 		else
-# 			echo "Warning: Mirror update failed, reverting to default..."
-# 			pct exec $TEMPLATE_ID -- sed -i "s|$UBUNTU_MIRROR|archive.ubuntu.com|g" /etc/apt/sources.list
-# 			pct exec $TEMPLATE_ID -- apt-get update
-# 		fi
-# 	fi
-# fi
-
 # Run install-elk.sh inside container
+echo ""
 echo "Starting ELK Stack installation in container $TEMPLATE_ID..."
 echo "Installation will take 10-20 minutes (downloading large packages)"
 echo ""

@@ -115,7 +115,7 @@ if ! apt-get install -y \
     echo "ERROR: Failed to install dependencies" | tee -a "$LOG_FILE"
     exit 1
 fi
-step_done "Installing Dependencies"
+step_done "Installed Dependencies"
 
 # ----------------------------------------------------------------------------
 # Add Elastic Repository
@@ -128,7 +128,7 @@ wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | \
 # Add Elastic 8.x repository
 echo "deb [signed-by=/usr/share/keyrings/elasticsearch-keyring.gpg] https://artifacts.elastic.co/packages/8.x/apt stable main" \
     > /etc/apt/sources.list.d/elastic-8.x.list
-step_done "Adding Elastic Repository"
+step_done "Added Elastic Repository"
 
 # ----------------------------------------------------------------------------
 # Update Package Lists
@@ -136,7 +136,7 @@ step_done "Adding Elastic Repository"
 step_start "Updating Package Lists"
 # Update package list to include Elastic repository
 apt-get update
-step_done "Updating Package Lists"
+step_done "Updated Package Lists"
 
 # ----------------------------------------------------------------------------
 # Install ELK Stack Packages
@@ -149,7 +149,7 @@ if ! apt-get install -y elasticsearch logstash kibana; then
     echo "ERROR: Failed to install ELK Stack packages" | tee -a "$LOG_FILE"
     exit 1
 fi
-step_done "Installing ELK Stack (Elasticsearch, Logstash, Kibana)"
+step_done "Installed ELK Stack (Elasticsearch, Logstash, Kibana)"
 
 # ----------------------------------------------------------------------------
 # Prepare Elasticsearch Directories
@@ -217,14 +217,16 @@ step_done "Generated Keystore Passwords"
 # ----------------------------------------------------------------------------
 # Initialize Keystores
 # ----------------------------------------------------------------------------
-step_start "Initializing Keystores"
+step_start "Initializing Kibana Keystores"
 # Create Kibana keystore (for secure credential storage)
 # Remove existing keystore if present, then create new one
 rm -f /etc/kibana/kibana.keystore
 /usr/share/kibana/bin/kibana-keystore create
 chown kibana:root /etc/kibana/kibana.keystore
 chmod 0600 /etc/kibana/kibana.keystore
+step_done "Initialized Kibana Keystores"
 
+step_start "Initializing Logstash Keystores"
 # Create Logstash keystore with password from environment
 # Remove existing keystore if present, then create new one
 rm -f /etc/logstash/logstash.keystore
