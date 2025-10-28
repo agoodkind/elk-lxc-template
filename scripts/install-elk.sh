@@ -15,6 +15,8 @@ echo "Installation log: $LOG_FILE" | tee -a "$LOG_FILE"
 if [ -n "$UBUNTU_MIRROR" ] && [ "$UBUNTU_MIRROR" != "archive.ubuntu.com" ]; then
     echo "$(date '+%Y-%m-%d %H:%M:%S') - Configuring faster mirror: $UBUNTU_MIRROR" | tee -a "$LOG_FILE"
     sed -i "s|archive.ubuntu.com|$UBUNTU_MIRROR|g" /etc/apt/sources.list
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - Updating package lists from new mirror" | tee -a "$LOG_FILE"
+    apt-get update >> "$LOG_FILE" 2>&1
 fi
 
 # Logging function
@@ -47,6 +49,8 @@ log "Downloading Elastic GPG key"
 wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | gpg --dearmor -o /usr/share/keyrings/elasticsearch-keyring.gpg >> "$LOG_FILE" 2>&1
 echo "deb [signed-by=/usr/share/keyrings/elasticsearch-keyring.gpg] https://artifacts.elastic.co/packages/8.x/apt stable main" > /etc/apt/sources.list.d/elastic-8.x.list
 log "Elastic repository added"
+log "Updating package lists for Elastic repository"
+apt-get update >> "$LOG_FILE" 2>&1
 step_ok "Adding Elastic Repository"
 
 step_info "Installing ELK Stack (Elasticsearch, Logstash, Kibana)"
