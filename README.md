@@ -6,10 +6,18 @@ Automated installation of Elasticsearch, Logstash, and Kibana (ELK Stack) on Pro
 
 ### Method 1: Proxmox Community Script (Recommended)
 
-Use the single-file installer compatible with Proxmox community scripts:
+**Important**: `install.sh` must be built from source before use.
 
+Build the installer:
 ```bash
-bash -c "$(wget -qLO - https://raw.githubusercontent.com/YOUR_REPO/elk-lxc-template/main/out/install.sh)"
+git clone https://github.com/agoodkind/elk-lxc-template.git
+cd elk-lxc-template
+make clean && make
+```
+
+Run the generated installer:
+```bash
+bash out/install.sh
 ```
 
 This will:
@@ -21,11 +29,6 @@ This will:
 After installation, configure security:
 ```bash
 pct exec CONTAINER_ID -- /root/elk-configure-security.sh
-```
-
-**Note**: `out/install.sh` is generated from component scripts. To regenerate:
-```bash
-make clean && make
 ```
 
 ### Method 2: Manual Template Build

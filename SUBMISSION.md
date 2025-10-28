@@ -178,8 +178,8 @@ bash -c "$(wget -qLO - https://raw.githubusercontent.com/community-scripts/Proxm
 
 ### Support
 
-- GitHub Issues: https://github.com/YOUR_USERNAME/elk-lxc-template/issues
-- Documentation: https://github.com/YOUR_USERNAME/elk-lxc-template/blob/main/README.md
+- GitHub Issues: https://github.com/agoodkind/elk-lxc-template/issues
+- Documentation: https://github.com/agoodkind/elk-lxc-template/blob/main/README.md
 
 ## After Submission
 
@@ -198,9 +198,13 @@ Or via Proxmox VE Helper Scripts web interface.
 
 ## Alternative: Direct Installation
 
-If not submitting to community scripts, users can install directly:
+If not submitting to community scripts, users must build first:
+
 ```bash
-bash -c "$(wget -qLO - https://raw.githubusercontent.com/YOUR_USERNAME/elk-lxc-template/main/install.sh)"
+git clone https://github.com/agoodkind/elk-lxc-template.git
+cd elk-lxc-template
+make clean && make
+bash out/install.sh
 ```
 
 ## Maintenance
