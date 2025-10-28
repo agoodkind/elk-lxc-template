@@ -5,6 +5,12 @@
 
 set -e
 
+# Load Logstash keystore password from environment file
+if [ -f /etc/default/logstash ]; then
+    source /etc/default/logstash
+    export LOGSTASH_KEYSTORE_PASS
+fi
+
 # Reconfigure SSH server for new host keys
 dpkg-reconfigure -f noninteractive openssh-server
 
@@ -142,12 +148,14 @@ else
     echo "$KIBANA_API_KEY" | /usr/share/kibana/bin/kibana-keystore add elasticsearch.apiKey --stdin --force
 fi
 
-chown kibana:kibana /etc/kibana/kibana.keystore
+chown kibana:root /etc/kibana/kibana.keystore
+chmod 0600 /etc/kibana/kibana.keystore
 
 # Configure Logstash to use API key from keystore
 echo "Configuring Logstash with API key..."
 echo "$LOGSTASH_API_KEY" | /usr/share/logstash/bin/logstash-keystore add ELASTICSEARCH_API_KEY --stdin --force
-chown logstash:logstash /etc/logstash/logstash.keystore
+chown logstash:root /etc/logstash/logstash.keystore
+chmod 0600 /etc/logstash/logstash.keystore
 
 LOGSTASH_OUTPUT="/etc/logstash/conf.d/30-output.conf"
 
@@ -219,8 +227,9 @@ echo "  Backend SSL: $(if [[ $ENABLE_BACKEND_SSL =~ ^[Yy]$ ]]; then echo "Enable
 echo "  Frontend SSL: $(if [[ $ENABLE_FRONTEND_SSL =~ ^[Yy]$ ]]; then echo "Enabled"; else echo "Disabled"; fi)"
 echo "  Kibana keystore: /etc/kibana/kibana.keystore"
 echo "  Logstash keystore: /etc/logstash/logstash.keystore"
+echo "  Logstash keystore password: /etc/default/logstash"
 echo ""
-echo "IMPORTANT: Save this password now"
+echo "IMPORTANT: Save elastic password now"
 echo "It will not be displayed again or stored on disk"
 echo ""
 echo "Management:"

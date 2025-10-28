@@ -13,6 +13,12 @@ if [[ $EUID -ne 0 ]]; then
     exit 1
 fi
 
+# Load Logstash keystore password from environment file
+if [ -f /etc/default/logstash ]; then
+    source /etc/default/logstash
+    export LOGSTASH_KEYSTORE_PASS
+fi
+
 # Detect SSL configuration
 if grep -q "xpack.security.http.ssl.enabled: true" /etc/elasticsearch/elasticsearch.yml; then
     ES_URL="https://localhost:9200"
@@ -47,7 +53,8 @@ fi
 # Update Logstash keystore with new API key
 echo "Updating Logstash keystore..."
 echo "$LOGSTASH_API_KEY" | /usr/share/logstash/bin/logstash-keystore add ELASTICSEARCH_API_KEY --stdin --force
-chown logstash:logstash /etc/logstash/logstash.keystore
+chown logstash:root /etc/logstash/logstash.keystore
+chmod 0600 /etc/logstash/logstash.keystore
 
 # Clear sensitive variables from memory
 unset ELASTIC_PASSWORD LOGSTASH_API_KEY LOGSTASH_KEY_RESPONSE OLD_KEY_ID

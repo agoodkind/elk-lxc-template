@@ -30,6 +30,11 @@ function update_script() {
   msg_info "Updating ${APP}"
   $STD apt-get update
   $STD apt-get -y upgrade elasticsearch logstash kibana
+  # Load Logstash keystore password before restart
+  if [ -f /etc/default/logstash ]; then
+    source /etc/default/logstash
+    export LOGSTASH_KEYSTORE_PASS
+  fi
   $STD systemctl restart elasticsearch logstash kibana
   msg_ok "Updated Successfully"
   exit
