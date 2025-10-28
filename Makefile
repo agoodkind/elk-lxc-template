@@ -28,7 +28,7 @@ $(OUT_DIR):
 	@mkdir -p $(OUT_DIR)
 
 # Generate install.sh from component scripts
-$(OUT_DIR)/install.sh: $(OUT_DIR) templates/install-header.sh templates/extract-install-logic.awk scripts/install-steps.sh scripts/post-deploy.sh scripts/rotate-api-keys.sh templates/install-footer.sh config/logstash-pipelines/00-input.conf config/logstash-pipelines/30-output.conf
+$(OUT_DIR)/install.sh: $(OUT_DIR) templates/install-header.sh templates/extract-install-logic.awk scripts/install-steps.sh scripts/post-deploy.sh scripts/rotate-api-keys.sh templates/install-footer.sh config/elasticsearch.yml config/kibana.yml config/jvm.options.d/elasticsearch.options config/jvm.options.d/logstash.options config/logstash-pipelines/00-input.conf config/logstash-pipelines/30-output.conf
 	@echo "Generating out/install.sh from component scripts..."
 	@cat templates/install-header.sh > $(OUT_DIR)/install.sh
 	@echo "" >> $(OUT_DIR)/install.sh
