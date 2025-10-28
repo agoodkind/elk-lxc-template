@@ -217,23 +217,23 @@ step_done "Generated Keystore Passwords"
 # ----------------------------------------------------------------------------
 # Initialize Keystores
 # ----------------------------------------------------------------------------
-step_start "Initializing Kibana Keystores"
+step_start "Initializing Kibana Keystore"
 # Create Kibana keystore (for secure credential storage)
 # Remove existing keystore if present, then create new one
 rm -f /etc/kibana/kibana.keystore
 /usr/share/kibana/bin/kibana-keystore create
 chown kibana:root /etc/kibana/kibana.keystore
 chmod 0600 /etc/kibana/kibana.keystore
-step_done "Initialized Kibana Keystores"
+step_done "Initialized Kibana Keystore"
 
-step_start "Initializing Logstash Keystores"
+step_start "Initializing Logstash Keystore"
 # Create Logstash keystore with password from environment
 # Remove existing keystore if present, then create new one
 rm -f /etc/logstash/logstash.keystore
-/usr/share/logstash/bin/logstash-keystore create
+/usr/share/logstash/bin/logstash-keystore --path.settings /etc/logstash create 
 chown logstash:root /etc/logstash/logstash.keystore
 chmod 0600 /etc/logstash/logstash.keystore
-step_done "Initialized Keystores"
+step_done "Initialized Logstash Keystore"
 
 # ----------------------------------------------------------------------------
 # Enable Services
