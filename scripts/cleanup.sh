@@ -11,7 +11,7 @@ find /var/log -type f -exec truncate -s 0 {} \; 2>/dev/null
 
 # Clean temp files, apt cache, and shell history
 rm -rf /tmp/* /var/tmp/*
-apt clean
+apt-get clean
 history -c
 cat /dev/null > ~/.bash_history
 
