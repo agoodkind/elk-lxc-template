@@ -4,14 +4,24 @@
 
 ### Main Installation Script
 
-**File**: `install.sh`
+**File**: `out/install.sh` (generated from source)
 
 Single-file installer compatible with Proxmox community scripts framework.
 
-### Installation Command
+**Note**: Must be built from source before use.
 
+### Build and Installation
+
+1. **Build the installer**:
 ```bash
-bash -c "$(wget -qLO - https://raw.githubusercontent.com/agoodkind/elk-lxc-template/main/install.sh)"
+git clone https://github.com/agoodkind/elk-lxc-template.git
+cd elk-lxc-template
+make clean && make
+```
+
+2. **Run the installer**:
+```bash
+bash out/install.sh
 ```
 
 ### What Gets Installed
@@ -160,15 +170,15 @@ curl -k -u elastic:PASSWORD https://localhost:9200
 
 ### Next Steps
 
-1. **Test the script locally** on your Proxmox host
-2. **Update copyright** in `install.sh` with your name
-3. **Follow SUBMISSION.md** to submit to Proxmox community
-4. **Update README.md** with your GitHub URLs
+1. **Build the installer**: `make clean && make`
+2. **Test the script locally** on your Proxmox host
+3. **Commit built file**: `git add out/install.sh && git commit`
+4. **Follow SUBMISSION.md** to submit to Proxmox community
 
 ### Support
 
-- Issues: https://github.com/YOUR_USERNAME/elk-lxc-template/issues
-- Docs: https://github.com/YOUR_USERNAME/elk-lxc-template
+- Issues: https://github.com/agoodkind/elk-lxc-template/issues
+- Docs: https://github.com/agoodkind/elk-lxc-template
 - ELK Docs: https://www.elastic.co/guide/
 
 ### License
