@@ -167,12 +167,17 @@ echo "  pct exec $TEMPLATE_ID -- tail -f /var/log/elk-install.log"
 echo ""
 
 # install-elk.sh already has built-in shims and logging
-if pct exec $TEMPLATE_ID -- /tmp/install-elk.sh 2>&1 | tee -a /var/log/proxmox-elk-build.log; then
+# Use pipefail to catch exit codes through pipes
+set -o pipefail
+pct exec $TEMPLATE_ID -- /tmp/install-elk.sh 2>&1 | tee -a /var/log/proxmox-elk-build.log
+INSTALL_EXIT=$?
+set +o pipefail
+
+if [ $INSTALL_EXIT -eq 0 ]; then
     echo ""
     echo "============================================"
     echo "✓ Installation completed successfully"
 else
-    INSTALL_EXIT=$?
     echo ""
     echo "============================================"
     echo "✗ Installation failed with exit code $INSTALL_EXIT"

@@ -97,9 +97,11 @@ fi
 # Install System Dependencies
 # ----------------------------------------------------------------------------
 step_start "Installing Dependencies"
+# Required: wget (download GPG key), gnupg (process GPG), apt-transport-https & ca-certificates (HTTPS repos)
+#           openjdk-11 (Java for ELK), curl (API calls), unzip & openssl (SSL cert management)
 if ! apt-get install -y \
-    curl wget gnupg apt-transport-https ca-certificates \
-    openjdk-11-jre-headless vim net-tools htop unzip openssl; then
+    wget gnupg apt-transport-https ca-certificates \
+    openjdk-11-jre-headless curl unzip openssl; then
     echo "ERROR: Failed to install dependencies" | tee -a "$LOG_FILE"
     exit 1
 fi
