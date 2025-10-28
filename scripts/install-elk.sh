@@ -32,15 +32,6 @@ step_ok() {
     echo "✓ $1" | tee -a "$LOG_FILE"
 }
 
-# Update system and install dependencies
-log "Updating system packages"
-apt-get update >> "$LOG_FILE" 2>&1
-log "System update complete"
-
-# Skip full upgrade for faster template builds
-# Uncomment if you want full system upgrade:
-# apt-get upgrade -y >> "$LOG_FILE" 2>&1
-
 # Get directory of this script
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -59,8 +50,6 @@ log "Elastic repository added"
 step_ok "Adding Elastic Repository"
 
 step_info "Installing ELK Stack (Elasticsearch, Logstash, Kibana)"
-log "Running apt-get update"
-apt-get update >> "$LOG_FILE" 2>&1
 log "Downloading ELK packages (this may take several minutes)"
 echo "  (Downloading ~500MB of packages - check log for details)"
 apt-get install -y elasticsearch logstash kibana >> "$LOG_FILE" 2>&1
