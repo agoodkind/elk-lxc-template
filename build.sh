@@ -5,7 +5,8 @@
 #
 # ELK Stack LXC Template Builder
 # 
-# ENTRYPOINT: Run this script on a Proxmox host to build the ELK template
+# ENTRYPOINT: Run this script on a Proxmox host to build the ELK
+# template
 # 
 # This script:
 # 1. Creates a new LXC container from Ubuntu 24.04 base image
@@ -28,7 +29,8 @@
 # Logs:
 #   - Host output: stdout/stderr
 #   - Container installation: /var/log/elk-install.log (inside container)
-#   - Monitor live: pct exec <ID> -- tail -f /var/log/elk-install.log
+#   - Monitor live:
+#     pct exec <ID> -- tail -f /var/log/elk-install.log
 
 set -e
 
@@ -44,7 +46,8 @@ STORAGE="local-lvm"
 TEMPLATE_STORAGE="local"
 
 # Ubuntu mirror (set to faster mirror if default is slow)
-# Options: archive.ubuntu.com (default), mirrors.mit.edu, mirror.math.princeton.edu, mirror.us.leaseweb.net
+# Options: archive.ubuntu.com (default), mirrors.mit.edu,
+# mirror.math.princeton.edu, mirror.us.leaseweb.net
 UBUNTU_MIRROR="${UBUNTU_MIRROR:-archive.ubuntu.com}"
 
 # Auto-detect storage if defaults don't exist
@@ -52,20 +55,21 @@ echo "Checking storage configuration..."
 if ! pvesm status | grep -q "^$STORAGE "; then
     echo "Warning: Storage '$STORAGE' not found, detecting alternatives..."
     # Try common storage names
-    for storage_name in storage local-lvm local-zfs local-btrfs; do
-        if pvesm status | grep -q "^$storage_name " && pvesm status | grep -q "^$storage_name .* active"; then
-            STORAGE=$storage_name
-            echo "✓ Using container storage: $STORAGE"
-            break
-        fi
-    done
+	for storage_name in storage local-lvm local-zfs local-btrfs; do
+		if pvesm status | grep -q "^$storage_name " && \
+		   pvesm status | grep -q "^$storage_name .* active"; then
+			STORAGE=$storage_name
+			echo "✓ Using container storage: $STORAGE"
+			break
+		fi
+	done
 fi
 
 if ! pvesm status | grep -q "^$STORAGE "; then
-    echo "ERROR: No suitable storage found for containers"
-    echo "Available storage:"
-    pvesm status
-    exit 1
+	echo "ERROR: No suitable storage found for containers"
+	echo "Available storage:"
+	pvesm status
+	exit 1
 fi
 
 # Require root
@@ -92,7 +96,6 @@ pveam update
 
 if ! pveam list $TEMPLATE_STORAGE | grep -q "$BASE_IMAGE"; then
 	echo "Template not found locally, attempting download..."
-	
 	# Try to download the template
 	if ! pveam download $TEMPLATE_STORAGE $BASE_IMAGE; then
 		echo ""
@@ -102,7 +105,8 @@ if ! pveam list $TEMPLATE_STORAGE | grep -q "$BASE_IMAGE"; then
 		pveam available | grep "ubuntu-24.04"
 		echo ""
 		echo "Already downloaded templates:"
-		pveam list $TEMPLATE_STORAGE | grep ubuntu || echo "  (none)"
+		pveam list $TEMPLATE_STORAGE | grep ubuntu || \
+			echo "  (none)"
 		echo ""
 		echo "To use a different template, edit BASE_IMAGE in build.sh"
 		exit 1
@@ -113,7 +117,8 @@ fi
 
 # Set vm.max_map_count for Elasticsearch
 sysctl -w vm.max_map_count=262144
-grep -q "vm.max_map_count" /etc/sysctl.conf || echo "vm.max_map_count=262144" >> /etc/sysctl.conf
+grep -q "vm.max_map_count" /etc/sysctl.conf || \
+    echo "vm.max_map_count=262144" >> /etc/sysctl.conf
 
 # Create LXC container
 pct create $TEMPLATE_ID \
@@ -123,7 +128,8 @@ pct create $TEMPLATE_ID \
 	--hostname $TEMPLATE_NAME \
 	--memory $MEMORY \
 	--swap $SWAP \
-	--net0 name=eth0,bridge=vmbr0,ip=dhcp,ip6=dhcp,type=veth \
+	--net0 name=eth0,bridge=vmbr0,ip=dhcp,ip6=dhcp,\
+type=veth \
 	--onboot 0 \
 	--ostype ubuntu \
 	--rootfs ${STORAGE}:${DISK_SIZE} \
@@ -138,7 +144,8 @@ echo "Pushing scripts to container /tmp"
 # Push scripts to container /tmp
 for f in scripts/*.sh; do
 	echo "  Pushing $f to /tmp/$(basename $f)..."
-	pct push $TEMPLATE_ID "$f" "/tmp/$(basename $f)" --perms 755
+	pct push $TEMPLATE_ID "$f" "/tmp/$(basename $f)" \
+		--perms 755
 done
 
 echo ""
@@ -146,7 +153,8 @@ echo "Pushing post-deploy and management scripts to /root"
 # Push post-deploy and management scripts to /root
 for f in scripts/post-deploy.sh scripts/rotate-api-keys.sh; do
 	echo "  Pushing $f to /root/$(basename $f)..."
-	pct push $TEMPLATE_ID "$f" "/root/$(basename $f)" --perms 755
+	pct push $TEMPLATE_ID "$f" "/root/$(basename $f)" \
+		--perms 755
 done
 
 # Create config directory in container
@@ -155,7 +163,8 @@ echo "Creating config directory in container /tmp/elk-config"
 pct exec $TEMPLATE_ID -- mkdir -p /tmp/elk-config
 
 # Push config files to container
-for f in config/*.yml config/logstash-pipelines/*.conf config/jvm.options.d/*.options; do
+for f in config/*.yml config/logstash-pipelines/*.conf \
+		 config/jvm.options.d/*.options; do
 	echo " Pushing $f to /tmp/elk-config/$(basename $f)..."
 	pct push $TEMPLATE_ID "$f" "/tmp/elk-config/$(basename $f)"
 done
@@ -172,20 +181,22 @@ echo ""
 # install-elk.sh already has built-in shims and logging
 # Use pipefail to catch exit codes through pipes
 set -o pipefail
-pct exec $TEMPLATE_ID -- /tmp/install-elk.sh 2>&1 | tee -a /var/log/proxmox-elk-build.log
+pct exec $TEMPLATE_ID -- /tmp/install-elk.sh 2>&1 | \
+	tee -a /var/log/proxmox-elk-build.log
 INSTALL_EXIT=$?
 set +o pipefail
 
 if [ $INSTALL_EXIT -eq 0 ]; then
-    echo ""
-    echo "============================================"
-    echo "✓ Installation completed successfully"
+	echo ""
+	echo "============================================"
+	echo "✓ Installation completed successfully"
 else
-    echo ""
-    echo "============================================"
-    echo "✗ Installation failed with exit code $INSTALL_EXIT"
-    echo "Check log: pct exec $TEMPLATE_ID -- cat /var/log/elk-install.log"
-    exit 1
+	echo ""
+	echo "============================================"
+	echo "✗ Installation failed with exit code $INSTALL_EXIT"
+	echo "Check log: pct exec $TEMPLATE_ID -- cat \
+		/var/log/elk-install.log"
+	exit 1
 fi
 
 # Run cleanup script
@@ -203,13 +214,21 @@ vzdump $TEMPLATE_ID --compress zstd --dumpdir /var/lib/vz/template/cache --mode 
 
 if [ -f /var/lib/vz/template/cache/elk-stack-ubuntu-24.04.tar.zst ]; then
 	echo "Old template file found..."
-	echo "Removing old template file... /var/lib/vz/template/cache/elk-stack-ubuntu-24.04.tar.zst"
+	echo "Removing old template file... \
+		/var/lib/vz/template/cache/elk-stack-ubuntu-24.04.tar.zst"
 	rm -f /var/lib/vz/template/cache/elk-stack-ubuntu-24.04.tar.zst
 fi
 
 # Rename template file
-echo "Renaming template file... $(ls -t vzdump-lxc-${TEMPLATE_ID}-*.tar.zst | head -1) to elk-stack-ubuntu-24.04.tar.zst"
-cd /var/lib/vz/template/cache && mv "$(ls -t vzdump-lxc-${TEMPLATE_ID}-*.tar.zst | head -1)" elk-stack-ubuntu-24.04.tar.zst
+
+if [ -f "$(ls -t vzdump-lxc-${TEMPLATE_ID}-*.tar.zst | head -1)" ]; then
+	echo "Renaming template file... \
+		$(ls -t vzdump-lxc-${TEMPLATE_ID}-*.tar.zst | head -1) \
+		to elk-stack-ubuntu-24.04.tar.zst"
+	cd /var/lib/vz/template/cache && \
+		mv "$(ls -t vzdump-lxc-${TEMPLATE_ID}-*.tar.zst 2>/dev/null | head -1)" \
+		elk-stack-ubuntu-24.04.tar.zst
+fi
 
 # Output result
 echo "Template ready: /var/lib/vz/template/cache/elk-stack-ubuntu-24.04.tar.zst"
