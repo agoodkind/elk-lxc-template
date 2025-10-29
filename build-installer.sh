@@ -3,16 +3,17 @@
 # License: Apache-2.0
 #
 # Build script for ELK Stack Proxmox installer
-# Generates out/install.sh from component files
+# Generates install/elk-stack-install.sh from component files
 
 set -e
 
-# Output directory and file
+# Output directories and file
 OUT_DIR="out"
-OUT_FILE="$OUT_DIR/install.sh"
+INSTALL_DIR="$OUT_DIR/install"
+OUT_FILE="$INSTALL_DIR/elk-stack-install.sh"
 
-# Create output directory
-mkdir -p "$OUT_DIR"
+# Create output directories
+mkdir -p "$INSTALL_DIR"
 
 echo "Generating $OUT_FILE from component scripts..."
 
@@ -108,21 +109,8 @@ cat scripts/install-elk.sh \
 
 echo "" >> "$OUT_FILE"
 
-# Embed security configuration script
-cat << 'EOF' >> "$OUT_FILE"
-msg_info "Creating Management Scripts"
-cat > /root/elk-configure-security.sh << 'EOFSCRIPT'
-EOF
-
-# Strip headers from post-deploy.sh
-sed '1,/^set -e$/d' scripts/post-deploy.sh >> "$OUT_FILE"
-
-cat << 'EOF' >> "$OUT_FILE"
-EOFSCRIPT
-
-chmod +x /root/elk-configure-security.sh
-msg_ok "Created Security Configuration Script"
-EOF
+# Note: Security configuration is now done interactively during installation
+# post-deploy.sh is no longer embedded (kept for template build method only)
 
 echo "" >> "$OUT_FILE"
 

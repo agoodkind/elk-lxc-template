@@ -8,8 +8,12 @@ http.port: 9200
 cluster.name: elk-cluster
 node.name: ${HOSTNAME}
 
-# Disable security and SSL for demo/dev use
-xpack.security.enabled: false
+# Enable security with SSL
+xpack.security.enabled: true
 xpack.security.enrollment.enabled: false
-xpack.security.http.ssl.enabled: false
-xpack.security.transport.ssl.enabled: false
+xpack.security.http.ssl.enabled: true
+xpack.security.http.ssl.keystore.path: certs/http.p12
+xpack.security.transport.ssl.enabled: true
+xpack.security.transport.ssl.keystore.path: certs/transport.p12
+xpack.security.transport.ssl.truststore.path: certs/transport.p12
+xpack.security.transport.ssl.verification_mode: certificate
