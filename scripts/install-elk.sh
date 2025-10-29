@@ -15,7 +15,7 @@
 # 3. Standalone: Uses fallback shims for msg_* and silent() functions
 #
 # The shim pattern allows the same installation logic to work
-# in both contexts.
+# in all modes with automatic detection.
 
 set -e
 
