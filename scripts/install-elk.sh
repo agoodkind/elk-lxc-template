@@ -40,10 +40,29 @@ if ! command -v silent &> /dev/null; then
     }
 fi
 
+# Define verbose logging function
+msg_verbose() {
+    if [ "${VERBOSE}" = "yes" ] || [ "${var_verbose}" = "yes" ]; then
+        echo "$@"
+    fi
+}
+
 # Set STD if not already defined (Proxmox framework sets this)
 if [ -z "$STD" ]; then
     if [ "${VERBOSE}" = "yes" ] || [ "${var_verbose}" = "yes" ]; then
         STD=""  # Verbose mode: show all output
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "VERBOSE MODE ENABLED"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "Environment Variables:"
+        echo "  VERBOSE: ${VERBOSE:-<not set>}"
+        echo "  var_verbose: ${var_verbose:-<not set>}"
+        echo "  APPLICATION: ${APPLICATION:-<not set>}"
+        echo "  app: ${app:-<not set>}"
+        echo "  CTID: ${CTID:-<not set>}"
+        echo "  STD: ${STD:-<empty/verbose>}"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo ""
     else
         STD="silent"  # Quiet mode: use silent function
     fi
@@ -216,13 +235,21 @@ step_done "Updated Package Lists"
 # Install ELK Stack Packages
 # ----------------------------------------------------------------------------
 step_start "Installing ELK Stack (Elasticsearch, Logstash, Kibana)"
+msg_verbose "  → Downloading packages (~2GB, may take 5-15 minutes)..."
 # Log download information
 echo "$(date '+%Y-%m-%d %H:%M:%S') - Downloading ~2GB, \
 takes 5-15 minutes depending on network speed" | tee -a "$LOG_FILE"
 # Install all three ELK components
-if ! $STD apt-get install -y elasticsearch logstash kibana; then
-    echo "ERROR: Failed to install ELK Stack packages" | tee -a "$LOG_FILE"
-    exit 1
+if [ "$VERBOSE" = "yes" ]; then
+    if ! apt-get install -y elasticsearch logstash kibana; then
+        echo "ERROR: Failed to install ELK Stack packages" | tee -a "$LOG_FILE"
+        exit 1
+    fi
+else
+    if ! $STD apt-get install -y elasticsearch logstash kibana; then
+        echo "ERROR: Failed to install ELK Stack packages" | tee -a "$LOG_FILE"
+        exit 1
+    fi
 fi
 step_done "Installed ELK Stack (Elasticsearch, Logstash, Kibana)"
 
@@ -237,6 +264,7 @@ step_done "Prepared Elasticsearch Directories"
 # Deploy Elasticsearch Configuration
 # ----------------------------------------------------------------------------
 step_start "Deploying Elasticsearch Configuration"
+msg_verbose "  → Writing Elasticsearch configuration to /etc/elasticsearch/elasticsearch.yml..."
 
 # Append to default elasticsearch.yml
 cat >> /etc/elasticsearch/elasticsearch.yml << 'EOF'
@@ -284,6 +312,7 @@ step_done "Prepared Logstash Directories"
 # Deploy Logstash Configuration
 # ----------------------------------------------------------------------------
 step_start "Deploying Logstash Configuration"
+msg_verbose "  → Configuring Logstash JVM heap size..."
 
 # Configure heap size
 cat > /etc/logstash/jvm.options.d/heap.options << EOF
@@ -301,6 +330,7 @@ step_done "Deployed Logstash Configuration"
 # Deploy Kibana Configuration
 # ----------------------------------------------------------------------------
 step_start "Deploying Kibana Configuration"
+msg_verbose "  → Writing Kibana configuration to /etc/kibana/kibana.yml..."
 
 # Append to default kibana.yml
 cat >> /etc/kibana/kibana.yml << 'EOF'
@@ -318,6 +348,7 @@ step_done "Deployed Kibana Configuration"
 # Generate Keystore Passwords
 # ----------------------------------------------------------------------------
 step_start "Generating Keystore Passwords"
+msg_verbose "  → Generating secure password for Logstash keystore..."
 # Generate secure random password for Logstash keystore (required v8+)
 LOGSTASH_KEYSTORE_PASS=$(openssl rand -base64 32)
 
@@ -369,52 +400,84 @@ step_done "Initialized Logstash Keystore"
 if [ "${ENABLE_BACKEND_SSL:-true}" = "true" ]; then
     step_start "Generating SSL Certificates"
     
+    msg_verbose "  → Running elasticsearch-certutil to generate certificates..."
+    
     # Generate certificates
-    /usr/share/elasticsearch/bin/elasticsearch-certutil cert \
-        --silent --pem --out /tmp/certs.zip >/dev/null 2>&1
+    if [ "$VERBOSE" = "yes" ]; then
+        /usr/share/elasticsearch/bin/elasticsearch-certutil cert \
+            --silent --pem --out /tmp/certs.zip
+    else
+        /usr/share/elasticsearch/bin/elasticsearch-certutil cert \
+            --silent --pem --out /tmp/certs.zip >/dev/null 2>&1
+    fi
     
     # Verify cert file was created
     if [ ! -f /tmp/certs.zip ]; then
         echo "ERROR: Failed to generate certificates" | tee -a "$LOG_FILE"
         exit 1
     fi
+    msg_verbose "  ✓ Certificate zip created: /tmp/certs.zip"
     
     # Extract certificates
-    unzip -q /tmp/certs.zip -d /tmp/certs 2>/dev/null
+    msg_verbose "  → Extracting certificates..."
+    if [ "$VERBOSE" = "yes" ]; then
+        unzip -q /tmp/certs.zip -d /tmp/certs
+    else
+        unzip -q /tmp/certs.zip -d /tmp/certs 2>/dev/null
+    fi
     
     # Verify extraction
     if [ ! -d /tmp/certs/instance ]; then
         echo "ERROR: Failed to extract certificates" | tee -a "$LOG_FILE"
+        msg_verbose "$(ls -la /tmp/certs/)"
         exit 1
     fi
+    msg_verbose "  ✓ Certificates extracted to /tmp/certs/instance/"
     
+    msg_verbose "  → Creating certificate directories..."
     mkdir -p /etc/elasticsearch/certs
 
     # Convert PEM to PKCS12 for Elasticsearch (no password)
-    openssl pkcs12 -export \
-        -in /tmp/certs/instance/instance.crt \
-        -inkey /tmp/certs/instance/instance.key \
-        -out /etc/elasticsearch/certs/http.p12 \
-        -name "http" -passout pass: 2>/dev/null
+    msg_verbose "  → Converting certificates to PKCS12 format..."
+    if [ "$VERBOSE" = "yes" ]; then
+        openssl pkcs12 -export \
+            -in /tmp/certs/instance/instance.crt \
+            -inkey /tmp/certs/instance/instance.key \
+            -out /etc/elasticsearch/certs/http.p12 \
+            -name "http" -passout pass:
+    else
+        openssl pkcs12 -export \
+            -in /tmp/certs/instance/instance.crt \
+            -inkey /tmp/certs/instance/instance.key \
+            -out /etc/elasticsearch/certs/http.p12 \
+            -name "http" -passout pass: 2>/dev/null
+    fi
+    
+    msg_verbose "  → Copying http.p12 to transport.p12..."
     cp /etc/elasticsearch/certs/http.p12 \
         /etc/elasticsearch/certs/transport.p12
 
+    msg_verbose "  → Setting Elasticsearch certificate permissions..."
     chown -R elasticsearch:elasticsearch /etc/elasticsearch/certs
     chmod 660 /etc/elasticsearch/certs/*.p12
 
     # Copy CA cert for Kibana and Logstash
+    msg_verbose "  → Copying CA certificates to Kibana and Logstash..."
     mkdir -p /etc/kibana/certs /etc/logstash/certs
     cp /tmp/certs/ca/ca.crt /etc/kibana/certs/
     cp /tmp/certs/ca/ca.crt /etc/logstash/certs/
     
     if [ "${ENABLE_FRONTEND_SSL:-true}" = "true" ]; then
+        msg_verbose "  → Copying instance certificates to Kibana (SSL enabled)..."
         cp /tmp/certs/instance/instance.crt /etc/kibana/certs/
         cp /tmp/certs/instance/instance.key /etc/kibana/certs/
         chmod 640 /etc/kibana/certs/*
     else
+        msg_verbose "  → Configuring Kibana certificates (SSL disabled)..."
         chmod 640 /etc/kibana/certs/ca.crt
     fi
 
+    msg_verbose "  → Setting certificate ownership..."
     chown -R kibana:kibana /etc/kibana/certs
     chown -R logstash:logstash /etc/logstash/certs
     chmod 640 /etc/logstash/certs/ca.crt
@@ -435,9 +498,16 @@ fi
 # Start Elasticsearch (needed for user/key creation)
 # ----------------------------------------------------------------------------
 step_start "Starting Elasticsearch"
+msg_verbose "  → Enabling Elasticsearch service..."
 $STD systemctl enable elasticsearch
+msg_verbose "  → Starting Elasticsearch service..."
 $STD systemctl start elasticsearch
+msg_verbose "  → Waiting 30 seconds for Elasticsearch to initialize..."
 sleep 30
+msg_verbose "  → Checking Elasticsearch status..."
+if [ "$VERBOSE" = "yes" ]; then
+    systemctl status elasticsearch --no-pager || true
+fi
 step_done "Started Elasticsearch"
 
 # ----------------------------------------------------------------------------
@@ -456,9 +526,16 @@ fi
 # ----------------------------------------------------------------------------
 if [ "${ENABLE_BACKEND_SSL:-true}" = "true" ]; then
     step_start "Generating Elastic Password"
+    msg_verbose "  → Generating random password for elastic user..."
     ELASTIC_PASSWORD=$(tr -dc A-Za-z0-9 </dev/urandom | head -c 20)
-    echo "$ELASTIC_PASSWORD" | /usr/share/elasticsearch/bin/elasticsearch-reset-password \
-        -u elastic -b -s -i >/dev/null 2>&1
+    msg_verbose "  → Resetting elastic user password..."
+    if [ "$VERBOSE" = "yes" ]; then
+        echo "$ELASTIC_PASSWORD" | /usr/share/elasticsearch/bin/elasticsearch-reset-password \
+            -u elastic -b -s -i
+    else
+        echo "$ELASTIC_PASSWORD" | /usr/share/elasticsearch/bin/elasticsearch-reset-password \
+            -u elastic -b -s -i >/dev/null 2>&1
+    fi
     step_done "Generated Elastic Password"
 else
     ELASTIC_PASSWORD="disabled"
@@ -623,8 +700,15 @@ step_done "Saved Credentials"
 # Enable and Start Services
 # ----------------------------------------------------------------------------
 step_start "Starting Services"
+msg_verbose "  → Enabling Logstash and Kibana services..."
 $STD systemctl enable logstash kibana
+msg_verbose "  → Starting Logstash and Kibana services..."
 $STD systemctl start logstash kibana
+msg_verbose "  → Checking service status..."
+if [ "$VERBOSE" = "yes" ]; then
+    systemctl status logstash --no-pager || true
+    systemctl status kibana --no-pager || true
+fi
 step_done "Started Services"
 
 # ============================================================================
