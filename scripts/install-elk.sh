@@ -435,15 +435,15 @@ step_done "Initialized Logstash Keystore"
 if [ "${ENABLE_BACKEND_SSL:-true}" = "true" ]; then
     step_start "Generating SSL Certificates"
     
-    msg_verbose "  → Running elasticsearch-certutil to generate certificates..."
+    msg_verbose "  → Running elasticsearch-certutil to generate self-signed certificates..."
     
-    # Generate certificates
+    # Generate self-signed certificates (CA + instance certs)
     if [ "$VERBOSE" = "yes" ]; then
         /usr/share/elasticsearch/bin/elasticsearch-certutil cert \
-            --silent --pem --out /tmp/certs.zip
+            --self-signed --pem --out /tmp/certs.zip
     else
         /usr/share/elasticsearch/bin/elasticsearch-certutil cert \
-            --silent --pem --out /tmp/certs.zip >/dev/null 2>&1
+            --self-signed --pem --out /tmp/certs.zip >/dev/null 2>&1
     fi
     
     # Verify cert file was created
