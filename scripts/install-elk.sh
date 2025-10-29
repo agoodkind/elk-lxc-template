@@ -42,7 +42,7 @@ fi
 
 # Set STD if not already defined (Proxmox framework sets this)
 if [ -z "$STD" ]; then
-    if [ "${VERB}" = "yes" ] || [ "${var_verbose}" = "yes" ]; then
+    if [ "${VERBOSE}" = "yes" ] || [ "${var_verbose}" = "yes" ]; then
         STD=""  # Verbose mode: show all output
     else
         STD="silent"  # Quiet mode: use silent function
@@ -368,9 +368,26 @@ step_done "Initialized Logstash Keystore"
 # ----------------------------------------------------------------------------
 if [ "${ENABLE_BACKEND_SSL:-true}" = "true" ]; then
     step_start "Generating SSL Certificates"
+    
+    # Generate certificates
     /usr/share/elasticsearch/bin/elasticsearch-certutil cert \
         --silent --pem --out /tmp/certs.zip >/dev/null 2>&1
+    
+    # Verify cert file was created
+    if [ ! -f /tmp/certs.zip ]; then
+        echo "ERROR: Failed to generate certificates" | tee -a "$LOG_FILE"
+        exit 1
+    fi
+    
+    # Extract certificates
     unzip -q /tmp/certs.zip -d /tmp/certs 2>/dev/null
+    
+    # Verify extraction
+    if [ ! -d /tmp/certs/instance ]; then
+        echo "ERROR: Failed to extract certificates" | tee -a "$LOG_FILE"
+        exit 1
+    fi
+    
     mkdir -p /etc/elasticsearch/certs
 
     # Convert PEM to PKCS12 for Elasticsearch (no password)
