@@ -507,10 +507,7 @@ CLUSTER_NAME="${APPLICATION:-ELK-Stack}"
 cat >> /etc/elasticsearch/elasticsearch.yml << EOF
 
 # Network configuration (added after auto-config)
-# Prefer IPv6 and listen on all interfaces
-network.host:
-  - "::"
-  - "0.0.0.0"
+network.host: ["_local_", "_site_"]
 
 # Cluster identification (uses APPLICATION variable)
 cluster.name: ${CLUSTER_NAME}
