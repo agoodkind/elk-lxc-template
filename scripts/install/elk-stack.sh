@@ -53,12 +53,12 @@ msg_debug() {
         local msg="$1"
         local file="$2"
         if [ -n "$file" ] && [ -f "$file" ]; then
-            echo "  → $msg"
-            grep -v "^#" "$file" | grep -v "^$" | head -20 | sed 's/^/      /' || echo "      (empty or all comments)"
+            local file_content=$(grep -v "^#" "$file" | grep -v "^$" | head -20 | sed 's/^/DEBUG      /' || echo "DEBUG      (empty or all comments)")
+            echo -e "DEBUG: $msg\n---\n$file_content"
         elif [ -n "$file" ]; then
-            echo "  → $msg (file doesn't exist)"
+            echo "DEBUG: $msg (file $file doesn't exist)"
         else
-            echo "  → $msg"
+            echo "DEBUG: $msg"
         fi
     fi
 }
