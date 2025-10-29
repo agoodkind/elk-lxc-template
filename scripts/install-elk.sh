@@ -193,9 +193,9 @@ step_done "Installed Dependencies"
 # Add Elastic Repository
 # ----------------------------------------------------------------------------
 step_start "Adding Elastic Repository"
-# Download and install Elastic GPG key
-$STD wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | \
-    gpg --dearmor -o /usr/share/keyrings/elasticsearch-keyring.gpg
+# Download and install Elastic GPG key (don't use $STD - needs stdout for pipe)
+wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch 2>/dev/null | \
+    gpg --dearmor -o /usr/share/keyrings/elasticsearch-keyring.gpg 2>/dev/null
 
 # Add Elastic 8.x repository
 echo "deb \
