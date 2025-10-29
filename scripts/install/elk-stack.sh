@@ -43,7 +43,11 @@ fi
 # Define verbose logging function
 msg_verbose() {
     if [ "${VERBOSE}" = "yes" ] || [ "${var_verbose}" = "yes" ]; then
-        echo "$@"
+        if [ -n "${LOG_FILE:-}" ]; then
+            echo "$@" | tee -a "$LOG_FILE"
+        else
+            echo "$@"
+        fi
     fi
 }
 
@@ -52,23 +56,30 @@ msg_debug() {
     if [ "${DEBUG}" = "true" ]; then
         local msg="$1"
         local file="$2"
+        local output=""
         if [ -n "$file" ] && [ -f "$file" ]; then
             local file_content=$(grep -v "^#" "$file" | grep -v "^$" | head -20 | sed 's/^/DEBUG      /' || echo "DEBUG      (empty or all comments)")
-            echo -e "DEBUG: $msg\n---\n$file_content"
+            output=$(echo -e "DEBUG: $msg\n---\n$file_content")
         elif [ -n "$file" ]; then
-            echo "DEBUG: $msg (file $file doesn't exist)"
+            output="DEBUG: $msg (file $file doesn't exist)"
         else
-            echo "DEBUG: $msg"
+            output="DEBUG: $msg"
+        fi
+        if [ -n "${LOG_FILE:-}" ]; then
+            echo -e "$output" | tee -a "$LOG_FILE"
+        else
+            echo -e "$output"
         fi
     fi
 }
 
 # Define error logging function
 msg_error() {
+    local error_msg="✗ ERROR: $*"
     if [ -n "${LOG_FILE:-}" ]; then
-        echo "✗ ERROR: $*" | tee -a "$LOG_FILE"
+        echo "$error_msg" | tee -a "$LOG_FILE"
     else
-        echo "✗ ERROR: $*"
+        echo "$error_msg"
     fi
     
     # In verbose mode, show last ~100 lines of Elasticsearch log if available
@@ -76,13 +87,15 @@ msg_error() {
         local app_name="${app:-${APPLICATION:-elasticsearch}}"
         local es_log="/var/log/elasticsearch/${app_name}.log"
         if [ -f "$es_log" ]; then
-            echo ""
-            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-            echo "Last ~100 lines of Elasticsearch log ($es_log):"
-            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-            tail -n 100 "$es_log" 2>/dev/null || echo "  (unable to read log file)"
-            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-            echo ""
+            {
+                echo ""
+                echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                echo "Last ~100 lines of Elasticsearch log ($es_log):"
+                echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                tail -n 100 "$es_log" 2>/dev/null || echo "  (unable to read log file)"
+                echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                echo ""
+            } | if [ -n "${LOG_FILE:-}" ]; then tee -a "$LOG_FILE"; else cat; fi
         fi
     fi
 }
@@ -162,7 +175,7 @@ echo
 
 # Initialize logging (if not already set by caller)
 # Proxmox framework will define LOG_FILE, standalone mode uses default
-LOG_FILE="${LOG_FILE:-/var/log/elk-install.log}"
+LOG_FILE="${LOG_FILE:-/tmp/elk-install.log}"
 if [ ! -f "$LOG_FILE" ]; then
     echo "$(date '+%Y-%m-%d %H:%M:%S') - \
 Starting ELK Stack installation" | tee "$LOG_FILE"
@@ -710,14 +723,17 @@ step_done "Started Services"
 # INSTALLATION COMPLETE
 # ============================================================================
 msg_ok "Completed Successfully!"
-msg_info "Installation log saved to: $LOG_FILE (inside container)"
-msg_info "View credentials: cat /root/elk-credentials.txt"
-msg_info "Access Kibana: $KIBANA_URL"
 
 # Write final log message
 echo "" | tee -a "$LOG_FILE"
 echo "$(date '+%Y-%m-%d %H:%M:%S') - \
 ELK Stack installation completed successfully" \
     | tee -a "$LOG_FILE"
-echo "Installation log saved to: $LOG_FILE (inside container)" \
-    | tee -a "$LOG_FILE"
+
+# Print log file location prominently
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "Installation Log: $LOG_FILE"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+msg_info "View credentials: cat /root/elk-credentials.txt"
+msg_info "Access Kibana: $KIBANA_URL"
