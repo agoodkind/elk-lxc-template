@@ -47,6 +47,15 @@ msg_verbose() {
     fi
 }
 
+# Define error logging function
+msg_error() {
+    if [ -n "${LOG_FILE:-}" ]; then
+        echo "✗ ERROR: $*" | tee -a "$LOG_FILE"
+    else
+        echo "✗ ERROR: $*"
+    fi
+}
+
 # Enable verbose mode automatically in NON_INTERACTIVE mode
 if [ "${NON_INTERACTIVE:-false}" = "true" ] && [ "${VERBOSE:-no}" = "no" ]; then
     VERBOSE=yes
@@ -218,7 +227,7 @@ step_done() {
 # ----------------------------------------------------------------------------
 step_start "Update repositories"
 if ! $STD apt-get update; then
-    echo "ERROR: Failed to update repositories" | tee -a "$LOG_FILE"
+    msg_error "Failed to update repositories"
     exit 1
 fi
 step_done "Updated repositories"
@@ -235,7 +244,7 @@ if ! $STD apt-get install -y \
     wget gnupg apt-transport-https ca-certificates \
     openjdk-11-jre-headless curl unzip openssl \
     htop net-tools vim; then
-    echo "ERROR: Failed to install dependencies" | tee -a "$LOG_FILE"
+    msg_error "Failed to install dependencies"
     exit 1
 fi
 step_done "Installed Dependencies"
@@ -274,12 +283,12 @@ takes 5-15 minutes depending on network speed" | tee -a "$LOG_FILE"
 # Install all three ELK components
 if [ "$VERBOSE" = "yes" ]; then
     if ! apt-get install -y elasticsearch logstash kibana; then
-        echo "ERROR: Failed to install ELK Stack packages" | tee -a "$LOG_FILE"
+        msg_error "Failed to install ELK Stack packages"
         exit 1
     fi
 else
     if ! $STD apt-get install -y elasticsearch logstash kibana; then
-        echo "ERROR: Failed to install ELK Stack packages" | tee -a "$LOG_FILE"
+        msg_error "Failed to install ELK Stack packages"
         exit 1
     fi
 fi
@@ -507,7 +516,7 @@ if [ "${ENABLE_BACKEND_SSL:-true}" = "true" ]; then
     
     # Verify cert file was created
     if [ ! -f /tmp/certs.zip ]; then
-        echo "ERROR: Failed to generate certificates" | tee -a "$LOG_FILE"
+        msg_error "Failed to generate certificates"
         exit 1
     fi
     msg_verbose "  ✓ Certificate zip created: /tmp/certs.zip"
@@ -522,7 +531,7 @@ if [ "${ENABLE_BACKEND_SSL:-true}" = "true" ]; then
     
     # Verify extraction
     if [ ! -d /tmp/certs/instance ]; then
-        echo "ERROR: Failed to extract certificates" | tee -a "$LOG_FILE"
+        msg_error "Failed to extract certificates"
         msg_verbose "Certificate directory contents:"
         msg_verbose "$(ls -la /tmp/certs/ 2>&1)"
         exit 1
@@ -564,18 +573,33 @@ if [ "${ENABLE_BACKEND_SSL:-true}" = "true" ]; then
     msg_verbose "  → Copying CA certificates to Kibana and Logstash..."
     mkdir -p /etc/kibana/certs /etc/logstash/certs
     
-    # With --self-signed, CA cert is in the ca/ subdirectory
-    # But if it doesn't exist, use the instance cert as self-signed
+    # With --self-signed, CA cert location varies by Elasticsearch version
+    # Try multiple possible locations
+    CA_FOUND=false
     if [ -f /tmp/certs/ca/ca.crt ]; then
+        msg_verbose "  ✓ Found CA at /tmp/certs/ca/ca.crt"
         cp /tmp/certs/ca/ca.crt /etc/kibana/certs/
         cp /tmp/certs/ca/ca.crt /etc/logstash/certs/
+        CA_FOUND=true
     elif [ -f /tmp/certs/instance/ca.crt ]; then
+        msg_verbose "  ✓ Found CA at /tmp/certs/instance/ca.crt"
         cp /tmp/certs/instance/ca.crt /etc/kibana/certs/
         cp /tmp/certs/instance/ca.crt /etc/logstash/certs/
+        CA_FOUND=true
     else
-        echo "ERROR: CA certificate not found in expected locations" | tee -a "$LOG_FILE"
+        # Self-signed cert without separate CA - use instance cert as CA
+        msg_verbose "  ⚠ No separate CA certificate found, using instance cert as CA"
+        if [ -f /tmp/certs/instance/instance.crt ]; then
+            cp /tmp/certs/instance/instance.crt /etc/kibana/certs/ca.crt
+            cp /tmp/certs/instance/instance.crt /etc/logstash/certs/ca.crt
+            CA_FOUND=true
+        fi
+    fi
+    
+    if [ "$CA_FOUND" = false ]; then
+        msg_error "No certificate files found for CA"
         msg_verbose "  Available files:"
-        msg_verbose "$(find /tmp/certs -type f)"
+        msg_verbose "$(find /tmp/certs -type f 2>&1)"
         exit 1
     fi
     

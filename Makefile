@@ -27,11 +27,18 @@ template:
 
 # Install target (generates all submission files)
 .PHONY: installer
+installer: dirs
 installer: $(CT_DIR)/elk-stack.sh $(INSTALL_DIR)/elk-stack-install.sh $(HEADER_DIR)/elk-stack $(JSON_DIR)/elk-stack.json
 
 # Local mode installer (embeds everything)
 installer-local: export LOCAL_MODE=true
+installer-local: dirs
 installer-local: $(CT_DIR)/elk-stack.sh $(INSTALL_DIR)/elk-stack-install.sh $(HEADER_DIR)/elk-stack $(JSON_DIR)/elk-stack.json
+
+# Create output directories
+.PHONY: dirs
+dirs:
+	@mkdir -p $(CT_DIR) $(INSTALL_DIR) $(HEADER_DIR) $(JSON_DIR)
 
 # Default help target
 help:
