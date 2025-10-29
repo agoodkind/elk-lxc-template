@@ -23,9 +23,9 @@ PROXMOX_LOCAL_PATH="${PROXMOX_LOCAL_PATH:-/root/ProxmoxVE}"
 LOCAL_MODE="${LOCAL_MODE:-false}"
 
 if [ "$LOCAL_MODE" = "true" ]; then
-    echo "Building local/hybrid mode CT wrapper..."
+    echo "Building local mode CT wrapper (fully embedded)..."
     echo "  Downloading build.func from: $PROXMOX_REPO_URL"
-    echo "  Install script: $REPO_URL/$REPO_BRANCH/out/install/elk-stack-install.sh"
+    echo "  Embedding install script from: scripts/install-elk.sh"
     
     # Create temp file for modified build.func
     TEMP_BUILD_FUNC=$(mktemp)
@@ -36,9 +36,7 @@ if [ "$LOCAL_MODE" = "true" ]; then
         sed '/lxc-attach -n "\$CTID" -- bash -c "\$(curl -fsSL.*\/install\/\${var_install}\.sh)"/d' \
         > "$TEMP_BUILD_FUNC"
     
-    # Build output file in order (simpler than sed insertion)
-    INSTALL_URL="$REPO_URL/$REPO_BRANCH/out/install/elk-stack-install.sh"
-    
+    # Build file directly without sed substitution
     {
         # 1. Shebang
         echo "#!/usr/bin/env bash"
@@ -49,22 +47,33 @@ if [ "$LOCAL_MODE" = "true" ]; then
         cat "$TEMP_BUILD_FUNC"
         echo ""
         
-        # 3. Rest of ct-wrapper (skip shebang and {{BUILD_FUNC_SOURCE}})
-        sed -n '/{{BUILD_FUNC_SOURCE}}/,$ p' templates/ct-wrapper.sh | tail -n +2 \
-            | sed "s|{{INSTALL_SCRIPT_OVERRIDE}}|lxc-attach -n \"\$CTID\" -- bash -c \"\$(curl -fsSL $INSTALL_URL)\"|g"
+        # 3. CT wrapper content (between {{BUILD_FUNC_SOURCE}} and {{INSTALL_SCRIPT_OVERRIDE}})
+        sed -n '/{{BUILD_FUNC_SOURCE}}/,/{{INSTALL_SCRIPT_OVERRIDE}}/p' templates/ct-wrapper.sh \
+            | sed '1d;$d'
+        
+        # 4. Embedded install script
+        echo ""
+        echo "# Execute embedded install script (local testing mode)"
+        echo "lxc-attach -n \"\$CTID\" -- bash << 'INSTALL_SCRIPT_EOF'"
+        cat scripts/install-elk.sh
+        echo "INSTALL_SCRIPT_EOF"
+        echo ""
+        
+        # 5. Rest of ct-wrapper (after {{INSTALL_SCRIPT_OVERRIDE}})
+        sed -n '/{{INSTALL_SCRIPT_OVERRIDE}}/,$p' templates/ct-wrapper.sh | tail -n +2
     } > "$OUT_FILE"
     
     rm -f "$TEMP_BUILD_FUNC"
 else
     echo "Building remote mode CT wrapper..."
     echo "  ProxmoxVE URL: $PROXMOX_REPO_URL"
-    echo "  Install script: $REPO_URL/$REPO_BRANCH/out/install/elk-stack-install.sh"
+    echo "  Install script: $REPO_URL/$REPO_BRANCH/scripts/install-elk.sh"
     
     # Download build.func from GitHub
     BUILD_FUNC_REPLACEMENT="source <(curl -fsSL $PROXMOX_REPO_URL/misc/build.func)"
     
-    # Override install script download to point to our repo
-    INSTALL_URL="$REPO_URL/$REPO_BRANCH/out/install/elk-stack-install.sh"
+    # Download raw install-elk.sh from our repo
+    INSTALL_URL="$REPO_URL/$REPO_BRANCH/scripts/install-elk.sh"
     INSTALL_SCRIPT_REPLACEMENT="lxc-attach -n \"\$CTID\" -- bash -c \"\$(curl -fsSL $INSTALL_URL)\""
     
     # Replace placeholders in template

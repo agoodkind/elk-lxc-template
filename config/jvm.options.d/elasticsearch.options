@@ -1,4 +1,0 @@
-
-# JVM heap settings for Elasticsearch
--Xms2g
--Xmx2g

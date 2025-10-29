@@ -1,200 +1,113 @@
 # ELK Stack LXC - Quick Start
 
-## For Proxmox Community Script Submission
+## Installation
 
-### Main Installation Script
+### Run on Proxmox Host
 
-**File**: `out/install.sh` (generated from source)
+```bash
+bash -c "$(wget -qLO - https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/ct/elk-stack.sh)"
+```
 
-Single-file installer compatible with Proxmox community scripts framework.
+### Interactive Prompts
 
-**Note**: Must be built from source before use.
+During installation you'll be asked:
 
-### Build and Installation
+1. **SSL/TLS Configuration**
+   - [1] Full HTTPS (Elasticsearch + Kibana) [Recommended]
+   - [2] Backend only (Elasticsearch HTTPS, Kibana HTTP)
+   - [3] No SSL (HTTP only - testing/dev)
 
-1. **Build the installer**:
+2. **Memory Configuration** (optional)
+   - Default: Elasticsearch 2GB, Logstash 1GB
+   - Customize if needed
+
+### Installation Process
+
+- Creates Ubuntu 24.04 container
+- Installs ELK Stack 8.x
+- Configures security based on your choices
+- Generates unique password
+- Takes 10-20 minutes (~2GB download)
+
+## Post-Installation
+
+### Get Credentials
+
+```bash
+pct exec CONTAINER_ID -- cat /root/elk-credentials.txt
+```
+
+Shows:
+- Kibana URL
+- Username: `elastic`
+- Generated password
+- Management commands
+
+### Access Kibana
+
+```
+https://CONTAINER_IP:5601
+(or http if you chose No SSL)
+```
+
+### Reset Password
+
+```bash
+pct exec CONTAINER_ID -- /usr/share/elasticsearch/bin/elasticsearch-reset-password -u elastic
+```
+
+## Build from Source
+
+### For Development/Testing
 
 ```bash
 git clone https://github.com/agoodkind/elk-lxc-template.git
 cd elk-lxc-template
-make clean && make
+
+# Local mode (fully embedded, no GitHub needed)
+make clean && make installer-local
+
+# Copy to Proxmox
+scp out/ct/elk-stack.sh root@PROXMOX_HOST:/root/
+
+# Run
+ssh root@PROXMOX_HOST
+bash /root/elk-stack.sh
 ```
 
-2. **Run the installer**:
+### For PR Submission
 
 ```bash
-bash out/install.sh
+# Remote mode (uses GitHub URLs)
+make clean && make installer
+
+# Test locally first
+scp out/ct/elk-stack.sh root@PROXMOX_HOST:/root/
+# Push to GitHub, then test download
 ```
 
-### What Gets Installed
+## Service Ports
 
-1. **Container**: Ubuntu 24.04 LXC (4 CPU, 8GB RAM, 32GB disk)
-2. **ELK Stack**: Elasticsearch, Logstash, Kibana 8.x
-3. **Configuration**: Base configs for all services
-4. **Keystores**: Pre-initialized for secure credential storage
-5. **Management Scripts**:
-   - `/root/elk-configure-security.sh` - Enable authentication and SSL
-   - `/root/elk-rotate-api-keys.sh` - Rotate API keys
+- Elasticsearch: 9200
+- Kibana: 5601
+- Logstash: Configure custom pipelines in `/etc/logstash/conf.d/`
 
-### Post-Installation Steps
+## Updating
 
-1. **Access Initial Installation** (no authentication):
-
-   ```
-   http://CONTAINER_IP:5601
-   ```
-
-2. **Configure Security**:
-
-   ```bash
-   pct exec CONTAINER_ID -- /root/elk-configure-security.sh
-   ```
-
-   This will:
-   - Prompt for SSL options (backend and frontend)
-   - Generate certificates
-   - Create unique passwords
-   - Set up API keys in keystores
-   - Display elastic password (save it!)
-
-3. **Access Secured Installation**:
-
-   ```
-   http://CONTAINER_IP:5601  (or https if frontend SSL enabled)
-   Username: elastic
-   Password: [displayed during security configuration]
-   ```
-
-### Repository Structure
-
-```
-elk-lxc-template/
-├── out/install.sh         # Generated Proxmox community script (main file)
-├── README.md              # User documentation
-├── SUBMISSION.md          # Guide for submitting to Proxmox community
-├── QUICKSTART.md          # This file
-├── Makefile               # Build system
-├── build.sh               # Template builder for multiple deployments
-├── templates/             # Build templates
-│   ├── install-header.sh
-│   ├── install-footer.sh
-│   └── extract-install-logic.awk
-├── scripts/               # Installation scripts
-│   ├── install-steps.sh   # Installation logic (source of truth)
-│   ├── install-elk.sh
-│   ├── post-deploy.sh
-│   ├── cleanup.sh
-│   └── rotate-api-keys.sh
-├── config/                # Configuration files
-│   ├── elasticsearch.yml
-│   ├── kibana.yml
-│   ├── jvm.options.d/
-│   └── logstash-pipelines/
-├── tests/                 # Test suite
-│   └── test-build.sh
-└── examples/              # Deployment examples
-    └── deploy-example.sh
-```
-
-### Two Installation Methods
-
-#### Method 1: Community Script (Recommended for Proxmox)
-
-- Single command installation
-- Uses Proxmox framework
-- Perfect for community script submission
-- File: `install.sh`
-
-#### Method 2: Template Build (Optional for multiple deployments)
-
-- Build once, deploy many times
-- Good for organizations deploying multiple ELK instances
-- Files: `build.sh`, `scripts/`, `config/`, `examples/`
-
-### Key Features
-
-✅ **Security First**
-
-- No credentials in plain text
-- Keystores for API keys
-- SSL/TLS support
-- Unique passwords per installation
-
-✅ **Easy Management**
-
-- Update function included
-- API key rotation script
-- Service management commands
-- Clear documentation
-
-✅ **Production Ready**
-
-- Proper resource allocation
-- Service isolation
-- Tested configurations
-- Elasticsearch best practices
-
-### Service Ports
-
-- **Elasticsearch**: 9200 (HTTP API)
-- **Kibana**: 5601 (Web UI)
-- **Logstash**: 5044 (Beats input), 5000 (TCP JSON)
-
-### Resource Requirements
-
-- **Minimum**: 4 CPU, 8GB RAM, 32GB disk
-- **Elasticsearch heap**: 2GB (configured)
-- **Logstash heap**: 1GB (configured)
-
-### Updating ELK Stack
+Reset password or modify configurations anytime:
 
 ```bash
-bash -c "$(wget -qLO - URL_TO_SCRIPT)" -s --update
-```
-
-Or manually:
-
-```bash
-apt update && apt upgrade elasticsearch logstash kibana
-systemctl restart elasticsearch logstash kibana
-```
-
-### Troubleshooting
-
-**Services not starting?**
-
-```bash
-systemctl status elasticsearch logstash kibana
-journalctl -u elasticsearch -f
-```
-
-**Can't connect to Elasticsearch?**
-
-```bash
-curl http://localhost:9200
-# Or with SSL:
-curl -k -u elastic:PASSWORD https://localhost:9200
-```
-
-**Forgot password?**
-
-```bash
+# Reset password
 /usr/share/elasticsearch/bin/elasticsearch-reset-password -u elastic
+
+# Restart services
+systemctl restart elasticsearch logstash kibana
+
+# Update packages
+apt update && apt upgrade elasticsearch logstash kibana
 ```
 
-### Next Steps
+## Support
 
-1. **Build the installer**: `make clean && make`
-2. **Test the script locally** on your Proxmox host
-3. **Commit built file**: `git add out/install.sh && git commit`
-4. **Follow SUBMISSION.md** to submit to Proxmox community
-
-### Support
-
-- Issues: <https://github.com/agoodkind/elk-lxc-template/issues>
-- Docs: <https://github.com/agoodkind/elk-lxc-template>
-- ELK Docs: <https://www.elastic.co/guide/>
-
-### License
-
-Apache License 2.0 - Free to use and modify
+- Issues: https://github.com/agoodkind/elk-lxc-template/issues
+- ELK Docs: https://www.elastic.co/guide/

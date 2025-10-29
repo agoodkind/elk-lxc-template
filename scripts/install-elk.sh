@@ -41,15 +41,18 @@ else
     STD=" &>/dev/null"  # Quiet mode: suppress output
 fi
 
-echo
-echo "${TAB3}━━━ ELK Stack Configuration ━━━"
-echo
-echo "${TAB3}SSL/TLS Configuration:"
-echo "${TAB3}[1] Full HTTPS (Elasticsearch + Kibana) [Recommended]"
-echo "${TAB3}[2] Backend only (Elasticsearch HTTPS, Kibana HTTP)"
-echo "${TAB3}[3] No SSL (HTTP only - testing/dev)"
-read -rp "${TAB3}Enter your choice (default: 1): " SSL_CHOICE
-SSL_CHOICE=${SSL_CHOICE:-1}
+# Check if running interactively or if variables pre-set (template build mode)
+if [ -z "$SSL_CHOICE" ]; then
+  echo
+  echo "${TAB3}━━━ ELK Stack Configuration ━━━"
+  echo
+  echo "${TAB3}SSL/TLS Configuration:"
+  echo "${TAB3}[1] Full HTTPS (Elasticsearch + Kibana) [Recommended]"
+  echo "${TAB3}[2] Backend only (Elasticsearch HTTPS, Kibana HTTP)"
+  echo "${TAB3}[3] No SSL (HTTP only - testing/dev)"
+  read -rp "${TAB3}Enter your choice (default: 1): " SSL_CHOICE
+  SSL_CHOICE=${SSL_CHOICE:-1}
+fi
 
 case $SSL_CHOICE in
 1)
@@ -71,13 +74,21 @@ case $SSL_CHOICE in
   ;;
 esac
 
-echo
-read -rp "${TAB3}Customize JVM heap sizes? (default: Elasticsearch 2GB, Logstash 1GB) [y/N]: " CUSTOMIZE_MEMORY
+if [ -z "$CUSTOMIZE_MEMORY" ]; then
+  echo
+  read -rp "${TAB3}Customize JVM heap sizes? (default: Elasticsearch 2GB, Logstash 1GB) [y/N]: " CUSTOMIZE_MEMORY
+fi
+
 if [[ ${CUSTOMIZE_MEMORY,,} =~ ^(y|yes)$ ]]; then
-  echo "${TAB3}Memory Configuration:"
-  read -rp "${TAB3}Elasticsearch heap size in GB (default: 2): " ES_HEAP_GB
+  if [ -z "$ES_HEAP_GB" ]; then
+    echo "${TAB3}Memory Configuration:"
+    read -rp "${TAB3}Elasticsearch heap size in GB (default: 2): " ES_HEAP_GB
+  fi
   ES_HEAP_GB=${ES_HEAP_GB:-2}
-  read -rp "${TAB3}Logstash heap size in GB (default: 1): " LS_HEAP_GB
+  
+  if [ -z "$LS_HEAP_GB" ]; then
+    read -rp "${TAB3}Logstash heap size in GB (default: 1): " LS_HEAP_GB
+  fi
   LS_HEAP_GB=${LS_HEAP_GB:-1}
 else
   ES_HEAP_GB=2
@@ -137,22 +148,7 @@ step_done() {
     msg_ok "[$STEP] ${1:-Completed}"
 }
 
-# Handle configuration file deployment
-# In standalone mode: Reads from /tmp/elk-config (pushed by build.sh)
-# In Proxmox mode: Embeds files inline (defined in Makefile)
-if ! command -v handle_config &> /dev/null; then
-    handle_config() {
-        local source="/tmp/elk-config/$1"
-        local dest="$2"
-        local mode="${3:-overwrite}"  # append or overwrite
-        
-        if [ "$mode" = "append" ]; then
-            cat "$source" >> "$dest" 2>> "$LOG_FILE"
-        else
-            cat "$source" > "$dest" 2>> "$LOG_FILE"
-        fi
-    }
-fi
+# Configuration is now embedded inline (no external files needed)
 
 # ============================================================================
 # INSTALLATION STEPS
@@ -226,15 +222,38 @@ step_done "Installed ELK Stack (Elasticsearch, Logstash, Kibana)"
 # Prepare Elasticsearch Directories
 # ----------------------------------------------------------------------------
 step_start "Preparing Elasticsearch Directories"
-mkdir -p /etc/elasticsearch/jvm.options.d
+$STD mkdir -p /etc/elasticsearch/jvm.options.d
 step_done "Prepared Elasticsearch Directories"
 
 # ----------------------------------------------------------------------------
 # Deploy Elasticsearch Configuration
 # ----------------------------------------------------------------------------
 step_start "Deploying Elasticsearch Configuration"
-handle_config "elasticsearch.yml" \
-    "/etc/elasticsearch/elasticsearch.yml" "append"
+
+# Append to default elasticsearch.yml
+cat >> /etc/elasticsearch/elasticsearch.yml << 'EOF'
+
+# Elasticsearch network configuration
+# Prefer IPv6 and listen on all interfaces
+network.host:
+  - "::"
+  - "0.0.0.0"
+http.port: 9200
+
+# Cluster and node settings
+cluster.name: elk-cluster
+node.name: ${HOSTNAME}
+
+# Enable security with SSL
+xpack.security.enabled: true
+xpack.security.enrollment.enabled: false
+xpack.security.http.ssl.enabled: true
+xpack.security.http.ssl.keystore.path: certs/http.p12
+xpack.security.transport.ssl.enabled: true
+xpack.security.transport.ssl.keystore.path: certs/transport.p12
+xpack.security.transport.ssl.truststore.path: certs/transport.p12
+xpack.security.transport.ssl.verification_mode: certificate
+EOF
 
 # Configure heap size based on user input
 cat > /etc/elasticsearch/jvm.options.d/heap.options << EOF
@@ -249,31 +268,42 @@ step_done "Deployed Elasticsearch Configuration"
 # Prepare Logstash Directories
 # ----------------------------------------------------------------------------
 step_start "Preparing Logstash Directories"
-mkdir -p /etc/logstash/conf.d
-mkdir -p /etc/logstash/jvm.options.d
+$STD mkdir -p /etc/logstash/conf.d
+$STD mkdir -p /etc/logstash/jvm.options.d
 step_done "Prepared Logstash Directories"
 
 # ----------------------------------------------------------------------------
 # Deploy Logstash Configuration
 # ----------------------------------------------------------------------------
 step_start "Deploying Logstash Configuration"
-handle_config "00-input.conf" "/etc/logstash/conf.d/00-input.conf"
-handle_config "30-output.conf" "/etc/logstash/conf.d/30-output.conf"
 
-# Configure heap size based on user input  
+# Configure heap size
 cat > /etc/logstash/jvm.options.d/heap.options << EOF
 
 # JVM heap settings for Logstash
 -Xms${LS_HEAP_GB:-1}g
 -Xmx${LS_HEAP_GB:-1}g
 EOF
+
+# Note: Pipelines will be configured based on SSL choice
+# Users can add custom pipelines to /etc/logstash/conf.d/ after installation
 step_done "Deployed Logstash Configuration"
 
 # ----------------------------------------------------------------------------
 # Deploy Kibana Configuration
 # ----------------------------------------------------------------------------
 step_start "Deploying Kibana Configuration"
-handle_config "kibana.yml" "/etc/kibana/kibana.yml" "append"
+
+# Append to default kibana.yml
+cat >> /etc/kibana/kibana.yml << 'EOF'
+
+# Kibana server configuration
+server.port: 5601
+# Prefer IPv6 and listen on all interfaces
+server.host: "::"
+
+# Elasticsearch connection will be configured based on SSL choice
+EOF
 step_done "Deployed Kibana Configuration"
 
 # ----------------------------------------------------------------------------
@@ -286,8 +316,8 @@ LOGSTASH_KEYSTORE_PASS=$(openssl rand -base64 32)
 # Store in /etc/default/logstash for systemd service
 echo "LOGSTASH_KEYSTORE_PASS=\"${LOGSTASH_KEYSTORE_PASS}\"" \
     > /etc/default/logstash
-chown root:root /etc/default/logstash
-chmod 0600 /etc/default/logstash
+$STD chown root:root /etc/default/logstash
+$STD chmod 0600 /etc/default/logstash
 
 # Add to root's environment for interactive sessions
 if ! grep -q "LOGSTASH_KEYSTORE_PASS" /root/.bashrc; then
@@ -308,21 +338,21 @@ step_done "Generated Keystore Passwords"
 step_start "Initializing Kibana Keystore"
 # Create Kibana keystore for secure credential storage
 # Kibana keystore uses file permissions (0600) for security
-rm -f /etc/kibana/kibana.keystore
+$STD rm -f /etc/kibana/kibana.keystore
 export KBN_PATH_CONF=/etc/kibana
-/usr/share/kibana/bin/kibana-keystore create
-chown kibana:root /etc/kibana/kibana.keystore
-chmod 0600 /etc/kibana/kibana.keystore
+$STD /usr/share/kibana/bin/kibana-keystore create
+$STD chown kibana:root /etc/kibana/kibana.keystore
+$STD chmod 0600 /etc/kibana/kibana.keystore
 step_done "Initialized Kibana Keystore"
 
 step_start "Initializing Logstash Keystore"
 # Create Logstash keystore with password (required in v8+)
 # Password passed via LOGSTASH_KEYSTORE_PASS environment variable
-rm -f /etc/logstash/logstash.keystore
-/usr/share/logstash/bin/logstash-keystore \
+$STD rm -f /etc/logstash/logstash.keystore
+$STD /usr/share/logstash/bin/logstash-keystore \
     --path.settings /etc/logstash create 
-chown logstash:root /etc/logstash/logstash.keystore
-chmod 0600 /etc/logstash/logstash.keystore
+$STD chown logstash:root /etc/logstash/logstash.keystore
+$STD chmod 0600 /etc/logstash/logstash.keystore
 step_done "Initialized Logstash Keystore"
 
 # ----------------------------------------------------------------------------
@@ -333,7 +363,7 @@ if [ "${ENABLE_BACKEND_SSL:-true}" = "true" ]; then
     $STD /usr/share/elasticsearch/bin/elasticsearch-certutil cert \
         --silent --pem --out /tmp/certs.zip
     $STD unzip -q /tmp/certs.zip -d /tmp/certs
-    mkdir -p /etc/elasticsearch/certs
+    $STD mkdir -p /etc/elasticsearch/certs
 
     # Convert PEM to PKCS12 for Elasticsearch
     $STD openssl pkcs12 -export \
@@ -341,30 +371,30 @@ if [ "${ENABLE_BACKEND_SSL:-true}" = "true" ]; then
         -inkey /tmp/certs/instance/instance.key \
         -out /etc/elasticsearch/certs/http.p12 \
         -name "http" -passout pass:
-    cp /etc/elasticsearch/certs/http.p12 \
+    $STD cp /etc/elasticsearch/certs/http.p12 \
         /etc/elasticsearch/certs/transport.p12
 
-    chown -R elasticsearch:elasticsearch /etc/elasticsearch/certs
-    chmod 660 /etc/elasticsearch/certs/*.p12
+    $STD chown -R elasticsearch:elasticsearch /etc/elasticsearch/certs
+    $STD chmod 660 /etc/elasticsearch/certs/*.p12
 
     # Copy CA cert for Kibana and Logstash
-    mkdir -p /etc/kibana/certs /etc/logstash/certs
-    cp /tmp/certs/ca/ca.crt /etc/kibana/certs/
-    cp /tmp/certs/ca/ca.crt /etc/logstash/certs/
+    $STD mkdir -p /etc/kibana/certs /etc/logstash/certs
+    $STD cp /tmp/certs/ca/ca.crt /etc/kibana/certs/
+    $STD cp /tmp/certs/ca/ca.crt /etc/logstash/certs/
     
     if [ "${ENABLE_FRONTEND_SSL:-true}" = "true" ]; then
-        cp /tmp/certs/instance/instance.crt /etc/kibana/certs/
-        cp /tmp/certs/instance/instance.key /etc/kibana/certs/
-        chmod 640 /etc/kibana/certs/*
+        $STD cp /tmp/certs/instance/instance.crt /etc/kibana/certs/
+        $STD cp /tmp/certs/instance/instance.key /etc/kibana/certs/
+        $STD chmod 640 /etc/kibana/certs/*
     else
-        chmod 640 /etc/kibana/certs/ca.crt
+        $STD chmod 640 /etc/kibana/certs/ca.crt
     fi
 
-    chown -R kibana:kibana /etc/kibana/certs
-    chown -R logstash:logstash /etc/logstash/certs
-    chmod 640 /etc/logstash/certs/ca.crt
+    $STD chown -R kibana:kibana /etc/kibana/certs
+    $STD chown -R logstash:logstash /etc/logstash/certs
+    $STD chmod 640 /etc/logstash/certs/ca.crt
 
-    rm -rf /tmp/certs /tmp/certs.zip
+    $STD rm -rf /tmp/certs /tmp/certs.zip
     step_done "Generated SSL Certificates"
 else
     step_start "Disabling SSL"
@@ -380,7 +410,7 @@ fi
 # Start Elasticsearch (needed for user/key creation)
 # ----------------------------------------------------------------------------
 step_start "Starting Elasticsearch"
-systemctl enable elasticsearch
+$STD systemctl enable elasticsearch
 $STD systemctl start elasticsearch
 sleep 30
 step_done "Started Elasticsearch"
@@ -439,22 +469,22 @@ if [ "${ENABLE_BACKEND_SSL:-true}" = "true" ]; then
     # Configure Kibana keystore
     if [ -n "$KIBANA_TOKEN" ]; then
         export KBN_PATH_CONF=/etc/kibana
-        echo "$KIBANA_TOKEN" | /usr/share/kibana/bin/kibana-keystore add \
+        echo "$KIBANA_TOKEN" | $STD /usr/share/kibana/bin/kibana-keystore add \
             elasticsearch.serviceAccountToken --stdin --force
     else
         export KBN_PATH_CONF=/etc/kibana
-        echo "$KIBANA_API_KEY" | /usr/share/kibana/bin/kibana-keystore add \
+        echo "$KIBANA_API_KEY" | $STD /usr/share/kibana/bin/kibana-keystore add \
             elasticsearch.apiKey --stdin --force
     fi
-    chown kibana:root /etc/kibana/kibana.keystore
-    chmod 0600 /etc/kibana/kibana.keystore
+    $STD chown kibana:root /etc/kibana/kibana.keystore
+    $STD chmod 0600 /etc/kibana/kibana.keystore
 
     # Configure Logstash keystore
-    echo "$LOGSTASH_API_KEY" | /usr/share/logstash/bin/logstash-keystore \
+    echo "$LOGSTASH_API_KEY" | $STD /usr/share/logstash/bin/logstash-keystore \
         --path.settings /etc/logstash \
         add ELASTICSEARCH_API_KEY --stdin --force
-    chown logstash:root /etc/logstash/logstash.keystore
-    chmod 0600 /etc/logstash/logstash.keystore
+    $STD chown logstash:root /etc/logstash/logstash.keystore
+    $STD chmod 0600 /etc/logstash/logstash.keystore
 fi
 
 # Update Logstash output configuration
@@ -530,8 +560,8 @@ Security Notes:
 - Certificate files in /etc/*/certs/
 
 Management:
-- Rotate API keys: /root/elk-rotate-api-keys.sh
 - Reset password: /usr/share/elasticsearch/bin/elasticsearch-reset-password -u elastic
+- Restart services: systemctl restart elasticsearch logstash kibana
 EOF
 chmod 600 /root/elk-credentials.txt
 
@@ -541,7 +571,7 @@ step_done "Configured Security"
 # Enable and Start Services
 # ----------------------------------------------------------------------------
 step_start "Starting Services"
-systemctl enable logstash kibana
+$STD systemctl enable logstash kibana
 $STD systemctl start logstash kibana
 step_done "Started Services"
 
@@ -551,8 +581,7 @@ step_done "Started Services"
 msg_ok "Completed Successfully!\n"
 msg_info "Installation log saved to: $LOG_FILE (inside container)"
 msg_info "View credentials: cat /root/elk-credentials.txt"
-msg_info "Access Kibana: http${ENABLE_BACKEND_SSL:-true ? 's' : ''}://$(hostname -I | awk '{print $1}'):5601"
-msg_info "Manage API keys: /root/elk-rotate-api-keys.sh"
+msg_info "Access Kibana at port 5601 (HTTPS if you enabled SSL)"
 
 # Write final log message
 echo "" | tee -a "$LOG_FILE"

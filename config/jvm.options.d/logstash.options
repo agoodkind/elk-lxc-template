@@ -1,4 +1,0 @@
-
-# JVM heap settings for Logstash
--Xms1g
--Xmx1g
