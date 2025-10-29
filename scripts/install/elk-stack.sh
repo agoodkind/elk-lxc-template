@@ -547,6 +547,10 @@ if [ "${ENABLE_BACKEND_SSL:-true}" = "true" ]; then
     ES_KEYSTORE_PASS=$(openssl rand -base64 32)
     
     # Convert PEM to PKCS12 for Elasticsearch with password
+    # Note: We generate PEM format (--pem flag) because:
+    #   - Kibana and Logstash need PEM certificates directly (instance.crt/instance.key)
+    #   - Elasticsearch requires PKCS12 format (.p12) for SSL keystores
+    #   Converting PEM→PKCS12 is simpler than generating PKCS12 and extracting PEM
     msg_verbose "  → Converting certificates to PKCS12 format..."
     if [ "$VERBOSE" = "yes" ]; then
         openssl pkcs12 -export \
