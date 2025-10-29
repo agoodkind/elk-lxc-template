@@ -53,10 +53,11 @@ msg_verbose() {
 
 # Define debug function to show file contents
 msg_debug() {
-    if [ "${DEBUG}" = "true" ]; then
+    if [ "${DEBUG}" = "yes" ] ; then
         local msg="$1"
         local file="$2"
         local output=""
+        
         if [ -n "$file" ] && [ -f "$file" ]; then
             local file_content=$(grep -v "^#" "$file" | grep -v "^$" | head -20 | sed 's/^/DEBUG      /' || echo "DEBUG      (empty or all comments)")
             output=$(echo -e "DEBUG: $msg\n---\n$file_content")
@@ -65,6 +66,7 @@ msg_debug() {
         else
             output="DEBUG: $msg"
         fi
+
         if [ -n "${LOG_FILE:-}" ]; then
             echo -e "$output" | tee -a "$LOG_FILE"
         else
@@ -323,7 +325,7 @@ step_done "Prepared Logstash Directories"
 # ----------------------------------------------------------------------------
 # Deploy Logstash Configuration
 # ----------------------------------------------------------------------------
-step_start "Deploying Logstash Configuration"
+step_start "Configuring Logstash JVM Heap"
 msg_verbose "  → Configuring Logstash JVM heap size..."
 msg_debug "Existing jvm.options.d/heap.options" /etc/logstash/jvm.options.d/heap.options
 # Configure heap size
@@ -550,10 +552,10 @@ ELASTIC_PASSWORD=$(tr -dc A-Za-z0-9 </dev/urandom | head -c 20)
 msg_verbose "  → Resetting elastic user password..."
 if [ "$VERBOSE" = "yes" ]; then
     echo "$ELASTIC_PASSWORD" | /usr/share/elasticsearch/bin/elasticsearch-reset-password \
-        -u elastic -b -s -i
+        -u elastic -b -s
 else
     echo "$ELASTIC_PASSWORD" | /usr/share/elasticsearch/bin/elasticsearch-reset-password \
-        -u elastic -b -s -i >/dev/null 2>&1
+        -u elastic -b -s >/dev/null 2>&1
 fi
 step_done "Generated Elastic Password"
 
