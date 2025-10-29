@@ -62,10 +62,10 @@ if grep -q "^step_done" scripts/install-elk.sh; then test_pass "install-elk.sh u
 
 STEP_START_COUNT=$(grep -c "^step_start" scripts/install-elk.sh || echo 0)
 STEP_DONE_COUNT=$(grep -c "^step_done" scripts/install-elk.sh || echo 0)
-if [[ $STEP_START_COUNT -eq $STEP_DONE_COUNT && $STEP_START_COUNT -gt 0 ]]; then
+if [[ $STEP_START_COUNT -eq $STEP_DONE_COUNT && $STEP_START_COUNT -ge 19 ]]; then
     test_pass "step_start/step_done balanced ($STEP_START_COUNT steps)"
 else
-    test_fail "step_start/step_done mismatch"
+    test_fail "step_start/step_done mismatch (start: $STEP_START_COUNT, done: $STEP_DONE_COUNT)"
 fi
 
 if grep -q "if ! command -v msg_info" scripts/install-elk.sh; then test_pass "msg_info shim present"; else test_fail "msg_info shim missing"; fi
