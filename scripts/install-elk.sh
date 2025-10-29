@@ -33,12 +33,20 @@ STEP=0
 # Define TAB3 if not already set (for standalone mode)
 TAB3="${TAB3:-   }"
 
-# Define $STD based on VERB/var_verbose (Proxmox framework variable)
-# VERB is set by framework: "yes" = verbose, "no" = quiet
-if [ "${VERB}" = "yes" ] || [ "${var_verbose}" = "yes" ]; then
-    STD=""  # Verbose mode: show all output
-else
-    STD="&>/dev/null"  # Quiet mode: suppress output
+# Define silent function if not already defined (from Proxmox framework)
+if ! command -v silent &> /dev/null; then
+    silent() {
+        "$@" >/dev/null 2>&1
+    }
+fi
+
+# Set STD if not already defined (Proxmox framework sets this)
+if [ -z "$STD" ]; then
+    if [ "${VERB}" = "yes" ] || [ "${var_verbose}" = "yes" ]; then
+        STD=""  # Verbose mode: show all output
+    else
+        STD="silent"  # Quiet mode: use silent function
+    fi
 fi
 
 # Check if running interactively or if variables pre-set (template build mode)
