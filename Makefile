@@ -2,7 +2,7 @@
 # Copyright (c) 2025 Alex Goodkind (alex@goodkind.io)
 # License: Apache-2.0
 
-.PHONY: clean test test-quick check-components help
+.PHONY: clean test test-quick check-components help installer-local
 
 # Output directories
 OUT_DIR = out
@@ -10,6 +10,12 @@ CT_DIR = $(OUT_DIR)/ct
 INSTALL_DIR = $(OUT_DIR)/install
 HEADER_DIR = $(CT_DIR)/headers
 JSON_DIR = $(OUT_DIR)/frontend/public/json
+
+# Build configuration variables
+REPO_URL ?= https://raw.githubusercontent.com/agoodkind/elk-lxc-template
+REPO_BRANCH ?= main
+PROXMOX_REPO_URL ?= https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main
+PROXMOX_LOCAL_PATH ?= /root/ProxmoxVE
 
 # Help is the interactive default
 .DEFAULT_GOAL := help
@@ -23,18 +29,42 @@ template:
 .PHONY: installer
 installer: $(CT_DIR)/elk-stack.sh $(INSTALL_DIR)/elk-stack-install.sh $(HEADER_DIR)/elk-stack $(JSON_DIR)/elk-stack.json
 
+# Local mode installer (uses local ProxmoxVE folder)
+installer-local: export LOCAL_MODE=true
+installer-local: $(CT_DIR)/elk-stack.sh $(INSTALL_DIR)/elk-stack-install.sh $(HEADER_DIR)/elk-stack $(JSON_DIR)/elk-stack.json
+
 # Default help target
 help:
 	@echo "ELK Stack LXC Template - Makefile"
 	@echo ""
-	@echo "Targets:"
-	@echo "  make template        Build template (runs build-template.sh)"
-	@echo "  make installer       Build install script (out/install.sh)"
-	@echo "  make clean           Remove generated files"
-	@echo "  make test            Run comprehensive test suite"
-	@echo "  make test-quick      Quick syntax validation"
-	@echo "  make check-components  Verify all component files exist"
-	@echo "  make help            Show this help message"
+	@echo "Build Targets:"
+	@echo "  make installer              Build for ProxmoxVE submission (remote mode)"
+	@echo "  make installer-local        Build for local testing (hybrid mode)"
+	@echo "  make template               Build LXC template (runs build-template.sh)"
+	@echo ""
+	@echo "Test Targets:"
+	@echo "  make test                   Run comprehensive test suite"
+	@echo "  make test-quick             Quick syntax validation"
+	@echo "  make check-components       Verify all component files exist"
+	@echo ""
+	@echo "Build Configuration:"
+	@echo "  REPO_URL=<url>              Your GitHub repo URL (default: agoodkind/elk-lxc-template)"
+	@echo "  REPO_BRANCH=<branch>        Branch to use (default: main)"
+	@echo "  PROXMOX_REPO_URL=<url>      ProxmoxVE repo URL (default: community-scripts/ProxmoxVE)"
+	@echo "  PROXMOX_LOCAL_PATH=<path>   Local ProxmoxVE path (default: /root/ProxmoxVE)"
+	@echo ""
+	@echo "Examples:"
+	@echo "  make installer                                    # Production build"
+	@echo "  make installer REPO_BRANCH=dev                    # Test dev branch"
+	@echo "  make installer-local PROXMOX_LOCAL_PATH=/custom   # Local testing"
+	@echo ""
+	@echo "Runtime Configuration (during installation):"
+	@echo "  - SSL/TLS options (Full HTTPS/Backend only/No SSL)"
+	@echo "  - JVM heap sizes (optional customization)"
+	@echo "  - Verbose output (controlled by Proxmox framework)"
+	@echo ""
+	@echo "Cleanup:"
+	@echo "  make clean                  Remove generated files"
 
 # Create output directories
 $(OUT_DIR):
@@ -47,8 +77,12 @@ $(OUT_DIR):
 # Generate ct/elk-stack.sh (wrapper script)
 $(CT_DIR)/elk-stack.sh: $(OUT_DIR) templates/ct-wrapper.sh
 	@echo "Generating $(CT_DIR)/elk-stack.sh..."
-	@cp templates/ct-wrapper.sh $(CT_DIR)/elk-stack.sh
-	@chmod +x $(CT_DIR)/elk-stack.sh
+	@REPO_URL=$(REPO_URL) \
+	 REPO_BRANCH=$(REPO_BRANCH) \
+	 PROXMOX_REPO_URL=$(PROXMOX_REPO_URL) \
+	 PROXMOX_LOCAL_PATH=$(PROXMOX_LOCAL_PATH) \
+	 LOCAL_MODE=$(LOCAL_MODE) \
+	 bash build-ct-wrapper.sh
 	@echo "✓ Generated $(CT_DIR)/elk-stack.sh successfully"
 
 # Generate install/elk-stack-install.sh (installation logic)

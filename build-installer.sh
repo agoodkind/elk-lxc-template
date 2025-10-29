@@ -15,7 +15,7 @@ OUT_FILE="$INSTALL_DIR/elk-stack-install.sh"
 # Create output directories
 mkdir -p "$INSTALL_DIR"
 
-echo "Generating $OUT_FILE from component scripts..."
+echo "Generating $OUT_FILE..."
 
 # Start with header
 cat templates/install-header.sh > "$OUT_FILE"
