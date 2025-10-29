@@ -202,7 +202,7 @@ step_done() {
 # Update repositories
 # ----------------------------------------------------------------------------
 step_start "Update repositories"
-if ! $STD apt-get update; then
+if ! DEBIAN_FRONTEND=noninteractive apt-get install -qq -y apt-get update; then
     msg_error "Failed to update repositories"
     exit 1
 fi
@@ -216,7 +216,7 @@ step_start "Installing Dependencies"
 #   apt-transport-https & ca-certificates (HTTPS repos),
 #   openjdk-11 (Java for ELK), curl (API calls),
 #   unzip & openssl (SSL cert management)
-if ! $STD apt-get install -y \
+if ! DEBIAN_FRONTEND=noninteractive apt-get install -qq -y apt-get install -y \
     wget gnupg apt-transport-https ca-certificates \
     openjdk-11-jre-headless curl unzip openssl \
     htop net-tools vim; then
