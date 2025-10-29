@@ -41,8 +41,8 @@ During installation:
 # On Proxmox host
 git clone https://github.com/agoodkind/elk-lxc-template.git
 cd elk-lxc-template
-chmod +x build-template.sh
-./build-template.sh
+chmod +x scripts/build/template.sh
+./scripts/build/template.sh
 ```
 
 Deploy from template:
@@ -113,13 +113,15 @@ make test-quick
 ```
 elk-lxc-template/
 ├── scripts/
-│   ├── install-elk.sh           # Single source of truth (all configs inline)
+│   ├── install/
+│   │   └── elk-stack.sh         # Single source of truth (all configs inline)
 │   └── build/
-│       ├── build-ct-wrapper.sh  # Generates out/ct/elk-stack.sh
-│       ├── build-installer.sh   # Generates out/install/elk-stack-install.sh
-│       └── build-template.sh    # Builds LXC template
+│       ├── ct-wrapper.sh        # Generates out/ct/elk-stack.sh
+│       ├── installer.sh         # Generates out/install/elk-stack-install.sh
+│       ├── template.sh          # Builds LXC template
+│       └── lib/                 # Build helper functions
 ├── templates/
-│   ├── ct-wrapper.sh            # CT wrapper template
+│   ├── elk-stack-ct-content.sh  # CT wrapper content template
 │   ├── header-ascii.txt         # ASCII art
 │   └── ui-metadata.json         # UI configuration
 ├── examples/

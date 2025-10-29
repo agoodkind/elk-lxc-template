@@ -35,17 +35,17 @@ cd "$(dirname "$0")/.."
 
 test_header "Component File Validation"
 
-if [[ -f templates/ct-wrapper.sh ]]; then test_pass "templates/ct-wrapper.sh exists"; else test_fail "templates/ct-wrapper.sh missing"; fi
+if [[ -f templates/elk-stack-ct-content.sh ]]; then test_pass "templates/elk-stack-ct-content.sh exists"; else test_fail "templates/elk-stack-ct-content.sh missing"; fi
 if [[ -f templates/header-ascii.txt ]]; then test_pass "templates/header-ascii.txt exists"; else test_fail "templates/header-ascii.txt missing"; fi
 if [[ -f templates/ui-metadata.json ]]; then test_pass "templates/ui-metadata.json exists"; else test_fail "templates/ui-metadata.json missing"; fi
-if [[ -f scripts/install-elk.sh ]]; then test_pass "scripts/install-elk.sh exists"; else test_fail "scripts/install-elk.sh missing"; fi
-if [[ -f scripts/build/build-ct-wrapper.sh ]]; then test_pass "build-ct-wrapper.sh exists"; else test_fail "build-ct-wrapper.sh missing"; fi
-if [[ -f scripts/build/build-installer.sh ]]; then test_pass "build-installer.sh exists"; else test_fail "build-installer.sh missing"; fi
-if [[ -f scripts/build/build-template.sh ]]; then test_pass "build-template.sh exists"; else test_fail "build-template.sh missing"; fi
+if [[ -f scripts/install/elk-stack.sh ]]; then test_pass "scripts/install/elk-stack.sh exists"; else test_fail "scripts/install/elk-stack.sh missing"; fi
+if [[ -f scripts/build/ct-wrapper.sh ]]; then test_pass "ct-wrapper.sh exists"; else test_fail "ct-wrapper.sh missing"; fi
+if [[ -f scripts/build/installer.sh ]]; then test_pass "installer.sh exists"; else test_fail "installer.sh missing"; fi
+if [[ -f scripts/build/template.sh ]]; then test_pass "template.sh exists"; else test_fail "template.sh missing"; fi
 
 test_header "Bash Syntax Validation"
 
-for script in scripts/*.sh scripts/build/*.sh examples/*.sh; do
+for script in scripts/install/*.sh scripts/build/*.sh examples/*.sh; do
     if [[ -f "$script" ]]; then
         if bash -n "$script" 2>/dev/null; then
             test_pass "$(basename "$script") syntax valid"
@@ -57,22 +57,22 @@ done
 
 test_header "Installation Script Validation"
 
-if grep -q "^step_start" scripts/install-elk.sh; then test_pass "install-elk.sh uses step_start"; else test_fail "install-elk.sh missing step_start"; fi
-if grep -q "^step_done" scripts/install-elk.sh; then test_pass "install-elk.sh uses step_done"; else test_fail "install-elk.sh missing step_done"; fi
+if grep -q "^step_start" scripts/install/elk-stack.sh; then test_pass "elk-stack.sh uses step_start"; else test_fail "elk-stack.sh missing step_start"; fi
+if grep -q "^step_done" scripts/install/elk-stack.sh; then test_pass "elk-stack.sh uses step_done"; else test_fail "elk-stack.sh missing step_done"; fi
 
-STEP_START_COUNT=$(grep -c "^step_start" scripts/install-elk.sh || echo 0)
-STEP_DONE_COUNT=$(grep -c "^step_done" scripts/install-elk.sh || echo 0)
+STEP_START_COUNT=$(grep -c "^step_start" scripts/install/elk-stack.sh || echo 0)
+STEP_DONE_COUNT=$(grep -c "^step_done" scripts/install/elk-stack.sh || echo 0)
 if [[ $STEP_START_COUNT -eq $STEP_DONE_COUNT && $STEP_START_COUNT -ge 19 ]]; then
     test_pass "step_start/step_done balanced ($STEP_START_COUNT steps)"
 else
     test_fail "step_start/step_done mismatch (start: $STEP_START_COUNT, done: $STEP_DONE_COUNT)"
 fi
 
-if grep -q "if ! command -v msg_info" scripts/install-elk.sh; then test_pass "msg_info shim present"; else test_fail "msg_info shim missing"; fi
-if grep -q "if ! command -v msg_ok" scripts/install-elk.sh; then test_pass "msg_ok shim present"; else test_fail "msg_ok shim missing"; fi
-if grep -q "INTERACTIVE CONFIGURATION" scripts/install-elk.sh; then test_pass "Interactive configuration present"; else test_fail "Interactive configuration missing"; fi
-if grep -q "SSL/TLS Configuration" scripts/install-elk.sh; then test_pass "SSL prompts present"; else test_fail "SSL prompts missing"; fi
-if grep -q "Customize JVM heap" scripts/install-elk.sh; then test_pass "Memory prompts present"; else test_fail "Memory prompts missing"; fi
+if grep -q "if ! command -v msg_info" scripts/install/elk-stack.sh; then test_pass "msg_info shim present"; else test_fail "msg_info shim missing"; fi
+if grep -q "if ! command -v msg_ok" scripts/install/elk-stack.sh; then test_pass "msg_ok shim present"; else test_fail "msg_ok shim missing"; fi
+if grep -q "INTERACTIVE CONFIGURATION" scripts/install/elk-stack.sh; then test_pass "Interactive configuration present"; else test_fail "Interactive configuration missing"; fi
+if grep -q "SSL/TLS Configuration" scripts/install/elk-stack.sh; then test_pass "SSL prompts present"; else test_fail "SSL prompts missing"; fi
+if grep -q "Customize JVM heap" scripts/install/elk-stack.sh; then test_pass "Memory prompts present"; else test_fail "Memory prompts missing"; fi
 
 test_header "Build System Validation"
 
@@ -100,7 +100,7 @@ if grep -q "build_container" out/ct/elk-stack.sh; then test_pass "build_containe
 
 test_header "Install Wrapper Validation"
 
-if grep -q "bash <(curl.*install-elk.sh)" out/install/elk-stack-install.sh; then test_pass "Install wrapper downloads install-elk.sh"; else test_fail "install-elk.sh download missing"; fi
+if grep -q "bash <(curl.*elk-stack.sh)" out/install/elk-stack-install.sh; then test_pass "Install wrapper downloads elk-stack.sh"; else test_fail "elk-stack.sh download missing"; fi
 
 test_header "JSON Metadata Validation"
 
