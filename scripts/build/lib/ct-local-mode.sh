@@ -63,6 +63,7 @@ build_local_mode() {
         cat <<'EOF'
 lxc-attach -n "$CTID" -- bash -c "
   export VERBOSE='$VERBOSE'
+  export DEBUG='$VERBOSE'
   export DIAGNOSTICS='$DIAGNOSTICS'
   export RANDOM_UUID='$RANDOM_UUID'
   export CACHER='$CACHER'
