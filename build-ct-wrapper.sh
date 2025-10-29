@@ -24,51 +24,37 @@ LOCAL_MODE="${LOCAL_MODE:-false}"
 
 if [ "$LOCAL_MODE" = "true" ]; then
     echo "Building local/hybrid mode CT wrapper..."
-    echo "  Embedding build.func from: ProxmoxVE/"
+    echo "  Downloading build.func from: $PROXMOX_REPO_URL"
     echo "  Install script: $REPO_URL/$REPO_BRANCH/out/install/elk-stack-install.sh"
-    
-    # Check if ProxmoxVE folder exists
-    if [ ! -f "ProxmoxVE/misc/build.func" ]; then
-        echo "ERROR: ProxmoxVE/misc/build.func not found!"
-        echo "Please ensure ProxmoxVE repository is cloned in the project directory."
-        exit 1
-    fi
     
     # Create temp file for modified build.func
     TEMP_BUILD_FUNC=$(mktemp)
     
-    # Copy build.func and remove the install script download line
-    sed '/lxc-attach -n "\$CTID" -- bash -c "\$(curl -fsSL.*\/install\/\${var_install}\.sh)"/d' \
-        ProxmoxVE/misc/build.func > "$TEMP_BUILD_FUNC"
+    # Download build.func and remove the install script download line
+    echo "  Downloading and modifying build.func..."
+    curl -fsSL "$PROXMOX_REPO_URL/misc/build.func" | \
+        sed '/lxc-attach -n "\$CTID" -- bash -c "\$(curl -fsSL.*\/install\/\${var_install}\.sh)"/d' \
+        > "$TEMP_BUILD_FUNC"
     
-    # Build the output file manually for local mode
-    cat templates/ct-wrapper.sh | sed '/{{BUILD_FUNC_SOURCE}}/d' > "$OUT_FILE"
-    
-    # Insert embedded build.func after shebang
-    {
-        echo ""
-        echo "# Embedded build.func (modified for local testing)"
-        cat "$TEMP_BUILD_FUNC"
-        echo ""
-    } | sed -i.bak '1 r /dev/stdin' "$OUT_FILE" || {
-        # macOS compatible version
-        head -1 "$OUT_FILE" > "$OUT_FILE.tmp"
-        echo ""
-        echo "# Embedded build.func (modified for local testing)"
-        cat "$TEMP_BUILD_FUNC"
-        echo ""
-        tail -n +2 "$OUT_FILE" >> "$OUT_FILE.tmp"
-        mv "$OUT_FILE.tmp" "$OUT_FILE"
-    }
-    
-    # Replace install script override placeholder
+    # Build output file in order (simpler than sed insertion)
     INSTALL_URL="$REPO_URL/$REPO_BRANCH/out/install/elk-stack-install.sh"
-    sed -i.bak "s|{{INSTALL_SCRIPT_OVERRIDE}}|lxc-attach -n \"\$CTID\" -- bash -c \"\$(curl -fsSL $INSTALL_URL)\"|g" "$OUT_FILE" || {
-        sed "s|{{INSTALL_SCRIPT_OVERRIDE}}|lxc-attach -n \"\$CTID\" -- bash -c \"\$(curl -fsSL $INSTALL_URL)\"|g" "$OUT_FILE" > "$OUT_FILE.tmp"
-        mv "$OUT_FILE.tmp" "$OUT_FILE"
-    }
     
-    rm -f "$TEMP_BUILD_FUNC" "$OUT_FILE.bak"
+    {
+        # 1. Shebang
+        echo "#!/usr/bin/env bash"
+        echo ""
+        
+        # 2. Embedded build.func
+        echo "# Embedded build.func (modified for local testing)"
+        cat "$TEMP_BUILD_FUNC"
+        echo ""
+        
+        # 3. Rest of ct-wrapper (skip shebang and {{BUILD_FUNC_SOURCE}})
+        sed -n '/{{BUILD_FUNC_SOURCE}}/,$ p' templates/ct-wrapper.sh | tail -n +2 \
+            | sed "s|{{INSTALL_SCRIPT_OVERRIDE}}|lxc-attach -n \"\$CTID\" -- bash -c \"\$(curl -fsSL $INSTALL_URL)\"|g"
+    } > "$OUT_FILE"
+    
+    rm -f "$TEMP_BUILD_FUNC"
 else
     echo "Building remote mode CT wrapper..."
     echo "  ProxmoxVE URL: $PROXMOX_REPO_URL"
