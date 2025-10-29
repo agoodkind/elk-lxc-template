@@ -33,23 +33,27 @@
     },
     "notes": [
         {
-            "text": "Installation downloads ~2GB of packages and takes 10-20 minutes. Please be patient!",
+            "text": "Installation takes 10-20 minutes (~2GB download). Interactive prompts will pause for your input.",
             "type": "warning"
         },
         {
-            "text": "Interactive prompts will ask for SSL configuration (Full HTTPS/Backend only/No SSL) and memory settings during installation.",
+            "text": "You will be prompted to choose: [1] Full HTTPS (recommended), [2] Backend HTTPS only, or [3] No SSL (testing only).",
             "type": "info"
         },
         {
-            "text": "After installation, retrieve credentials with: pct exec CONTAINER_ID -- cat /root/elk-credentials.txt",
+            "text": "Optional: Customize JVM heap sizes (defaults: Elasticsearch 2GB, Logstash 1GB). Minimum 8GB container RAM required.",
+            "type": "info"
+        },
+        {
+            "text": "After installation, get credentials with: pct exec CONTAINER_ID -- cat /root/elk-credentials.txt",
             "type": "warning"
         },
         {
-            "text": "Default heap sizes: Elasticsearch 2GB, Logstash 1GB. Configurable during installation.",
+            "text": "Security configured automatically: Unique passwords, SSL certificates, API keys in keystores.",
             "type": "info"
         },
         {
-            "text": "Unique elastic password generated, API keys created for Kibana and Logstash, SSL certificates auto-configured based on your choices.",
+            "text": "Access Kibana at https://CONTAINER_IP:5601 (or http if you chose No SSL). Username: elastic, password in credentials file.",
             "type": "info"
         }
     ]
