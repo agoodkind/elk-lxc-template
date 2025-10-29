@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-source <(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/misc/build.func)
+{{BUILD_FUNC_SOURCE}}
 # Copyright (c) 2025 Alex Goodkind
 # Author: Alex Goodkind (agoodkind)
 # License: Apache-2.0
@@ -44,12 +44,15 @@ start
 build_container
 description
 
+# Execute install script
+{{INSTALL_SCRIPT_OVERRIDE}}
+
 msg_ok "Completed Successfully!\n"
 echo -e "${CREATING}${GN}${APP} setup has been successfully initialized!${CL}"
-echo -e "${INFO}${YW} Services are running without security (no authentication)${CL}"
-echo -e "${INFO}${YW} To configure security (SSL, passwords, API keys):${CL}"
-echo -e "${TAB}${GATEWAY}${BGN}pct exec \$CTID -- /root/elk-configure-security.sh${CL}"
-echo -e "${INFO}${YW} Access Kibana using the following URL:${CL}"
-echo -e "${TAB}${GATEWAY}${BGN}http://\${IP}:5601${CL}"
-echo -e "${INFO}${YW} After security configuration, use the displayed credentials${CL}"
+echo -e "${INFO}${YW} Services configured with interactive prompts during installation${CL}"
+echo -e "${INFO}${YW} View credentials:${CL}"
+echo -e "${TAB}${GATEWAY}${BGN}pct exec \$CTID -- cat /root/elk-credentials.txt${CL}"
+echo -e "${INFO}${YW} Access Kibana:${CL}"
+echo -e "${TAB}${GATEWAY}${BGN}https://\${IP}:5601${CL}"
+echo -e "${INFO}${YW} (or http if you chose No SSL during installation)${CL}"
 

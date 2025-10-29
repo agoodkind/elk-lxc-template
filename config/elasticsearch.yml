@@ -1,7 +1,9 @@
 
 # Elasticsearch network configuration
 # Prefer IPv6 and listen on all interfaces
-network.host: [_::, 0.0.0.0]
+network.host:
+  - "::"
+  - "0.0.0.0"
 http.port: 9200
 
 # Cluster and node settings

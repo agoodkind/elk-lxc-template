@@ -33,6 +33,14 @@ STEP=0
 # Define TAB3 if not already set (for standalone mode)
 TAB3="${TAB3:-   }"
 
+# Define $STD based on VERB/var_verbose (Proxmox framework variable)
+# VERB is set by framework: "yes" = verbose, "no" = quiet
+if [ "${VERB}" = "yes" ] || [ "${var_verbose}" = "yes" ]; then
+    STD=""  # Verbose mode: show all output
+else
+    STD=" &>/dev/null"  # Quiet mode: suppress output
+fi
+
 echo
 echo "${TAB3}━━━ ELK Stack Configuration ━━━"
 echo
@@ -64,11 +72,17 @@ case $SSL_CHOICE in
 esac
 
 echo
-echo "${TAB3}Memory Configuration:"
-read -rp "${TAB3}Elasticsearch heap size in GB (default: 2): " ES_HEAP_GB
-ES_HEAP_GB=${ES_HEAP_GB:-2}
-read -rp "${TAB3}Logstash heap size in GB (default: 1): " LS_HEAP_GB
-LS_HEAP_GB=${LS_HEAP_GB:-1}
+read -rp "${TAB3}Customize JVM heap sizes? (default: Elasticsearch 2GB, Logstash 1GB) [y/N]: " CUSTOMIZE_MEMORY
+if [[ ${CUSTOMIZE_MEMORY,,} =~ ^(y|yes)$ ]]; then
+  echo "${TAB3}Memory Configuration:"
+  read -rp "${TAB3}Elasticsearch heap size in GB (default: 2): " ES_HEAP_GB
+  ES_HEAP_GB=${ES_HEAP_GB:-2}
+  read -rp "${TAB3}Logstash heap size in GB (default: 1): " LS_HEAP_GB
+  LS_HEAP_GB=${LS_HEAP_GB:-1}
+else
+  ES_HEAP_GB=2
+  LS_HEAP_GB=1
+fi
 
 echo
 
@@ -148,7 +162,7 @@ fi
 # Update repositories
 # ----------------------------------------------------------------------------
 step_start "Update repositories"
-if ! apt-get update; then
+if ! $STD apt-get update; then
     echo "ERROR: Failed to update repositories" | tee -a "$LOG_FILE"
     exit 1
 fi
@@ -162,7 +176,7 @@ step_start "Installing Dependencies"
 #   apt-transport-https & ca-certificates (HTTPS repos),
 #   openjdk-11 (Java for ELK), curl (API calls),
 #   unzip & openssl (SSL cert management)
-if ! apt-get install -y \
+if ! $STD apt-get install -y \
     wget gnupg apt-transport-https ca-certificates \
     openjdk-11-jre-headless curl unzip openssl \
     htop net-tools vim; then
@@ -176,7 +190,7 @@ step_done "Installed Dependencies"
 # ----------------------------------------------------------------------------
 step_start "Adding Elastic Repository"
 # Download and install Elastic GPG key
-wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | \
+$STD wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | \
     gpg --dearmor -o /usr/share/keyrings/elasticsearch-keyring.gpg
 
 # Add Elastic 8.x repository
@@ -191,7 +205,7 @@ step_done "Added Elastic Repository"
 # ----------------------------------------------------------------------------
 step_start "Updating Package Lists"
 # Update package list to include Elastic repository
-apt-get update
+$STD apt-get update
 step_done "Updated Package Lists"
 
 # ----------------------------------------------------------------------------
@@ -202,7 +216,7 @@ step_start "Installing ELK Stack (Elasticsearch, Logstash, Kibana)"
 echo "$(date '+%Y-%m-%d %H:%M:%S') - Downloading ~2GB, \
 takes 5-15 minutes depending on network speed" | tee -a "$LOG_FILE"
 # Install all three ELK components
-if ! apt-get install -y elasticsearch logstash kibana; then
+if ! $STD apt-get install -y elasticsearch logstash kibana; then
     echo "ERROR: Failed to install ELK Stack packages" | tee -a "$LOG_FILE"
     exit 1
 fi
@@ -318,11 +332,11 @@ if [ "${ENABLE_BACKEND_SSL:-true}" = "true" ]; then
     step_start "Generating SSL Certificates"
     $STD /usr/share/elasticsearch/bin/elasticsearch-certutil cert \
         --silent --pem --out /tmp/certs.zip
-    unzip -q /tmp/certs.zip -d /tmp/certs
+    $STD unzip -q /tmp/certs.zip -d /tmp/certs
     mkdir -p /etc/elasticsearch/certs
 
     # Convert PEM to PKCS12 for Elasticsearch
-    openssl pkcs12 -export \
+    $STD openssl pkcs12 -export \
         -in /tmp/certs/instance/instance.crt \
         -inkey /tmp/certs/instance/instance.key \
         -out /etc/elasticsearch/certs/http.p12 \
@@ -355,10 +369,10 @@ if [ "${ENABLE_BACKEND_SSL:-true}" = "true" ]; then
 else
     step_start "Disabling SSL"
     # Update Elasticsearch config to disable SSL
-    sed -i 's/xpack.security.http.ssl.enabled: true/xpack.security.enabled: false/' \
+    $STD sed -i 's/xpack.security.http.ssl.enabled: true/xpack.security.enabled: false/' \
         /etc/elasticsearch/elasticsearch.yml
-    sed -i '/xpack.security.http.ssl.keystore.path/d' /etc/elasticsearch/elasticsearch.yml
-    sed -i '/xpack.security.transport.ssl/d' /etc/elasticsearch/elasticsearch.yml
+    $STD sed -i '/xpack.security.http.ssl.keystore.path/d' /etc/elasticsearch/elasticsearch.yml
+    $STD sed -i '/xpack.security.transport.ssl/d' /etc/elasticsearch/elasticsearch.yml
     step_done "Disabled SSL"
 fi
 
@@ -388,8 +402,8 @@ fi
 # Generate and set elastic password (only if SSL enabled)
 if [ "${ENABLE_BACKEND_SSL:-true}" = "true" ]; then
     ELASTIC_PASSWORD=$(tr -dc A-Za-z0-9 </dev/urandom | head -c 20)
-    echo "$ELASTIC_PASSWORD" | /usr/share/elasticsearch/bin/elasticsearch-reset-password \
-        -u elastic -b -s -i > /dev/null 2>&1
+    echo "$ELASTIC_PASSWORD" | $STD /usr/share/elasticsearch/bin/elasticsearch-reset-password \
+        -u elastic -b -s -i
 else
     ELASTIC_PASSWORD="disabled"
 fi
@@ -535,6 +549,10 @@ step_done "Started Services"
 # INSTALLATION COMPLETE
 # ============================================================================
 msg_ok "Completed Successfully!\n"
+msg_info "Installation log saved to: $LOG_FILE (inside container)"
+msg_info "View credentials: cat /root/elk-credentials.txt"
+msg_info "Access Kibana: http${ENABLE_BACKEND_SSL:-true ? 's' : ''}://$(hostname -I | awk '{print $1}'):5601"
+msg_info "Manage API keys: /root/elk-rotate-api-keys.sh"
 
 # Write final log message
 echo "" | tee -a "$LOG_FILE"
