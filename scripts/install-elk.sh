@@ -70,15 +70,24 @@ fi
 
 # Check if running interactively or if variables pre-set (template build mode)
 if [ -z "$SSL_CHOICE" ]; then
-  echo
-  echo "${TAB3}━━━ ELK Stack Configuration ━━━"
-  echo
-  echo "${TAB3}SSL/TLS Configuration:"
-  echo "${TAB3}[1] Full HTTPS (Elasticsearch + Kibana) [Recommended]"
-  echo "${TAB3}[2] Backend only (Elasticsearch HTTPS, Kibana HTTP)"
-  echo "${TAB3}[3] No SSL (HTTP only - testing/dev)"
-  read -rp "${TAB3}Enter your choice (default: 1): " SSL_CHOICE </dev/tty
-  SSL_CHOICE=${SSL_CHOICE:-1}
+  # Check for non-interactive mode
+  if [ "${NON_INTERACTIVE:-false}" = "true" ]; then
+    echo "${TAB3}Running in non-interactive mode - using defaults"
+    SSL_CHOICE=1
+    CUSTOMIZE_MEMORY=no
+  else
+    echo
+    echo "${TAB3}━━━ ELK Stack Configuration ━━━"
+    echo
+    echo "${TAB3}Note: HTTPS uses self-signed certificates (suitable for internal use)"
+    echo
+    echo "${TAB3}SSL/TLS Configuration:"
+    echo "${TAB3}[1] Full HTTPS (Elasticsearch + Kibana) [Recommended]"
+    echo "${TAB3}[2] Backend only (Elasticsearch HTTPS, Kibana HTTP)"
+    echo "${TAB3}[3] No SSL (HTTP only - testing/dev)"
+    read -rp "${TAB3}Enter your choice (default: 1): " SSL_CHOICE </dev/tty
+    SSL_CHOICE=${SSL_CHOICE:-1}
+  fi
 fi
 
 case $SSL_CHOICE in
@@ -101,7 +110,7 @@ case $SSL_CHOICE in
   ;;
 esac
 
-if [ -z "$CUSTOMIZE_MEMORY" ]; then
+if [ -z "$CUSTOMIZE_MEMORY" ] && [ "${NON_INTERACTIVE:-false}" != "true" ]; then
   echo
   read -rp "${TAB3}Customize JVM heap sizes? (default: Elasticsearch 2GB, Logstash 1GB) [y/N]: " CUSTOMIZE_MEMORY </dev/tty
 fi
@@ -394,15 +403,19 @@ chown root:root /etc/default/logstash
 chmod 0600 /etc/default/logstash
 
 # Add to root's environment for interactive sessions
+msg_verbose "  → Adding Logstash keystore password to /root/.bashrc..."
 if ! grep -q "LOGSTASH_KEYSTORE_PASS" /root/.bashrc; then
     echo "" >> /root/.bashrc
     echo "# Logstash keystore password" >> /root/.bashrc
     echo "export LOGSTASH_KEYSTORE_PASS=\"\
 ${LOGSTASH_KEYSTORE_PASS}\"" >> /root/.bashrc
+    msg_verbose "  ✓ Added to .bashrc"
 fi
 
 # Export for current session
 export LOGSTASH_KEYSTORE_PASS
+msg_verbose "  ✓ Password exported to current session"
+msg_verbose "  ✓ Password length: ${#LOGSTASH_KEYSTORE_PASS} characters"
 
 step_done "Generated Keystore Passwords"
 
@@ -410,23 +423,46 @@ step_done "Generated Keystore Passwords"
 # Initialize Keystores
 # ----------------------------------------------------------------------------
 step_start "Initializing Kibana Keystore"
-# Create Kibana keystore for secure credential storage
-# Kibana keystore uses file permissions (0600) for security
+msg_verbose "  → Removing any existing Kibana keystore..."
 rm -f /etc/kibana/kibana.keystore
+msg_verbose "  → Setting KBN_PATH_CONF=/etc/kibana"
 export KBN_PATH_CONF=/etc/kibana
-/usr/share/kibana/bin/kibana-keystore create >/dev/null 2>&1
+msg_verbose "  → Creating new Kibana keystore..."
+if [ "$VERBOSE" = "yes" ]; then
+    /usr/share/kibana/bin/kibana-keystore create
+else
+    /usr/share/kibana/bin/kibana-keystore create >/dev/null 2>&1
+fi
+msg_verbose "  → Setting ownership to kibana:root"
 chown kibana:root /etc/kibana/kibana.keystore
+msg_verbose "  → Setting permissions to 0600"
 chmod 0600 /etc/kibana/kibana.keystore
+msg_verbose "  ✓ Keystore created at /etc/kibana/kibana.keystore"
+if [ "$VERBOSE" = "yes" ]; then
+    ls -lh /etc/kibana/kibana.keystore
+fi
 step_done "Initialized Kibana Keystore"
 
 step_start "Initializing Logstash Keystore"
-# Create Logstash keystore with password (required in v8+)
-# Password passed via LOGSTASH_KEYSTORE_PASS environment variable
+msg_verbose "  → Removing any existing Logstash keystore..."
 rm -f /etc/logstash/logstash.keystore
-/usr/share/logstash/bin/logstash-keystore \
-    --path.settings /etc/logstash create >/dev/null 2>&1
+msg_verbose "  → Creating new Logstash keystore with password..."
+msg_verbose "  → Using path: /etc/logstash"
+if [ "$VERBOSE" = "yes" ]; then
+    /usr/share/logstash/bin/logstash-keystore \
+        --path.settings /etc/logstash create
+else
+    /usr/share/logstash/bin/logstash-keystore \
+        --path.settings /etc/logstash create >/dev/null 2>&1
+fi
+msg_verbose "  → Setting ownership to logstash:root"
 chown logstash:root /etc/logstash/logstash.keystore
+msg_verbose "  → Setting permissions to 0600"
 chmod 0600 /etc/logstash/logstash.keystore
+msg_verbose "  ✓ Keystore created at /etc/logstash/logstash.keystore"
+if [ "$VERBOSE" = "yes" ]; then
+    ls -lh /etc/logstash/logstash.keystore
+fi
 step_done "Initialized Logstash Keystore"
 
 # ----------------------------------------------------------------------------
@@ -464,10 +500,15 @@ if [ "${ENABLE_BACKEND_SSL:-true}" = "true" ]; then
     # Verify extraction
     if [ ! -d /tmp/certs/instance ]; then
         echo "ERROR: Failed to extract certificates" | tee -a "$LOG_FILE"
-        msg_verbose "$(ls -la /tmp/certs/)"
+        msg_verbose "Certificate directory contents:"
+        msg_verbose "$(ls -la /tmp/certs/ 2>&1)"
         exit 1
     fi
     msg_verbose "  ✓ Certificates extracted to /tmp/certs/instance/"
+    msg_verbose "  → Certificate structure:"
+    if [ "$VERBOSE" = "yes" ]; then
+        find /tmp/certs -type f
+    fi
     
     msg_verbose "  → Creating certificate directories..."
     mkdir -p /etc/elasticsearch/certs
@@ -499,8 +540,21 @@ if [ "${ENABLE_BACKEND_SSL:-true}" = "true" ]; then
     # Copy CA cert for Kibana and Logstash
     msg_verbose "  → Copying CA certificates to Kibana and Logstash..."
     mkdir -p /etc/kibana/certs /etc/logstash/certs
-    cp /tmp/certs/ca/ca.crt /etc/kibana/certs/
-    cp /tmp/certs/ca/ca.crt /etc/logstash/certs/
+    
+    # With --self-signed, CA cert is in the ca/ subdirectory
+    # But if it doesn't exist, use the instance cert as self-signed
+    if [ -f /tmp/certs/ca/ca.crt ]; then
+        cp /tmp/certs/ca/ca.crt /etc/kibana/certs/
+        cp /tmp/certs/ca/ca.crt /etc/logstash/certs/
+    elif [ -f /tmp/certs/instance/ca.crt ]; then
+        cp /tmp/certs/instance/ca.crt /etc/kibana/certs/
+        cp /tmp/certs/instance/ca.crt /etc/logstash/certs/
+    else
+        echo "ERROR: CA certificate not found in expected locations" | tee -a "$LOG_FILE"
+        msg_verbose "  Available files:"
+        msg_verbose "$(find /tmp/certs -type f)"
+        exit 1
+    fi
     
     if [ "${ENABLE_FRONTEND_SSL:-true}" = "true" ]; then
         msg_verbose "  → Copying instance certificates to Kibana (SSL enabled)..."
@@ -586,6 +640,8 @@ fi
 # ----------------------------------------------------------------------------
 if [ "${ENABLE_BACKEND_SSL:-true}" = "true" ]; then
     step_start "Creating Kibana Service Token"
+    msg_verbose "  → Attempting to create Kibana service token via Elasticsearch API..."
+    msg_verbose "  → Endpoint: $ES_URL/_security/service/elastic/kibana/credential/token/kibana_token"
     KIBANA_TOKEN=$(curl $CURL_OPTS -s -X POST \
         "$ES_URL/_security/service/elastic/kibana/credential/token/kibana_token" \
         -u "elastic:$ELASTIC_PASSWORD" \
@@ -594,13 +650,18 @@ if [ "${ENABLE_BACKEND_SSL:-true}" = "true" ]; then
 
     # If service token fails, create API key
     if [ -z "$KIBANA_TOKEN" ]; then
+        msg_verbose "  ⚠ Service token creation failed, falling back to API key..."
         KIBANA_ROLE='{"name":"kibana_api_key","role_descriptors":{"kibana_system":{"cluster":["monitor","manage_index_templates","manage_ingest_pipelines","manage_ilm"],"indices":[{"names":["*"],"privileges":["all"]}]}}}'
+        msg_verbose "  → Creating Kibana API key with role: kibana_system"
         KIBANA_KEY_RESPONSE=$(curl $CURL_OPTS -s -X POST \
             "$ES_URL/_security/api_key" \
             -u "elastic:$ELASTIC_PASSWORD" \
             -H "Content-Type: application/json" \
             -d "$KIBANA_ROLE")
         KIBANA_API_KEY=$(echo "$KIBANA_KEY_RESPONSE" | grep -o '"encoded":"[^"]*' | cut -d'"' -f4)
+        msg_verbose "  ✓ Kibana API key created (length: ${#KIBANA_API_KEY} chars)"
+    else
+        msg_verbose "  ✓ Kibana service token created (length: ${#KIBANA_TOKEN} chars)"
     fi
     step_done "Created Kibana Credentials"
 
@@ -608,41 +669,81 @@ if [ "${ENABLE_BACKEND_SSL:-true}" = "true" ]; then
     # Create Logstash API Key
     # ----------------------------------------------------------------------------
     step_start "Creating Logstash API Key"
+    msg_verbose "  → Defining Logstash writer role with permissions for logs-*, logstash-*, ecs-*"
     LOGSTASH_ROLE='{"name":"logstash_writer","role_descriptors":{"logstash_writer":{"cluster":["monitor","manage_index_templates","manage_ilm"],"indices":[{"names":["logs-*","logstash-*","ecs-*"],"privileges":["write","create","create_index","manage","manage_ilm"]}]}}}'
+    msg_verbose "  → Creating API key via Elasticsearch API..."
+    msg_verbose "  → Endpoint: $ES_URL/_security/api_key"
     LOGSTASH_KEY_RESPONSE=$(curl $CURL_OPTS -s -X POST \
         "$ES_URL/_security/api_key" \
         -u "elastic:$ELASTIC_PASSWORD" \
         -H "Content-Type: application/json" \
         -d "$LOGSTASH_ROLE")
     LOGSTASH_API_KEY=$(echo "$LOGSTASH_KEY_RESPONSE" | grep -o '"encoded":"[^"]*' | cut -d'"' -f4)
+    msg_verbose "  ✓ Logstash API key created (length: ${#LOGSTASH_API_KEY} chars)"
+    if [ "$VERBOSE" = "yes" ] && [ -n "$LOGSTASH_API_KEY" ]; then
+        msg_verbose "  ✓ API key successfully extracted from response"
+    fi
     step_done "Created Logstash API Key"
 
     # ----------------------------------------------------------------------------
     # Configure Kibana Keystore
     # ----------------------------------------------------------------------------
     step_start "Configuring Kibana Keystore"
+    export KBN_PATH_CONF=/etc/kibana
     if [ -n "$KIBANA_TOKEN" ]; then
-        export KBN_PATH_CONF=/etc/kibana
-        echo "$KIBANA_TOKEN" | /usr/share/kibana/bin/kibana-keystore add \
-            elasticsearch.serviceAccountToken --stdin --force >/dev/null 2>&1
+        msg_verbose "  → Adding Kibana service token to keystore (elasticsearch.serviceAccountToken)..."
+        if [ "$VERBOSE" = "yes" ]; then
+            echo "$KIBANA_TOKEN" | /usr/share/kibana/bin/kibana-keystore add \
+                elasticsearch.serviceAccountToken --stdin --force
+        else
+            echo "$KIBANA_TOKEN" | /usr/share/kibana/bin/kibana-keystore add \
+                elasticsearch.serviceAccountToken --stdin --force >/dev/null 2>&1
+        fi
+        msg_verbose "  ✓ Service token added to keystore"
     else
-        export KBN_PATH_CONF=/etc/kibana
-        echo "$KIBANA_API_KEY" | /usr/share/kibana/bin/kibana-keystore add \
-            elasticsearch.apiKey --stdin --force >/dev/null 2>&1
+        msg_verbose "  → Adding Kibana API key to keystore (elasticsearch.apiKey)..."
+        if [ "$VERBOSE" = "yes" ]; then
+            echo "$KIBANA_API_KEY" | /usr/share/kibana/bin/kibana-keystore add \
+                elasticsearch.apiKey --stdin --force
+        else
+            echo "$KIBANA_API_KEY" | /usr/share/kibana/bin/kibana-keystore add \
+                elasticsearch.apiKey --stdin --force >/dev/null 2>&1
+        fi
+        msg_verbose "  ✓ API key added to keystore"
     fi
+    msg_verbose "  → Setting keystore ownership and permissions..."
     chown kibana:root /etc/kibana/kibana.keystore
     chmod 0600 /etc/kibana/kibana.keystore
+    msg_verbose "  ✓ Keystore configured with secure permissions"
+    if [ "$VERBOSE" = "yes" ]; then
+        msg_verbose "  → Listing keystore keys:"
+        /usr/share/kibana/bin/kibana-keystore list
+    fi
     step_done "Configured Kibana Keystore"
 
     # ----------------------------------------------------------------------------
     # Configure Logstash Keystore
     # ----------------------------------------------------------------------------
     step_start "Configuring Logstash Keystore"
-    echo "$LOGSTASH_API_KEY" | /usr/share/logstash/bin/logstash-keystore \
-        --path.settings /etc/logstash \
-        add ELASTICSEARCH_API_KEY --stdin --force >/dev/null 2>&1
+    msg_verbose "  → Adding Logstash API key to keystore (ELASTICSEARCH_API_KEY)..."
+    if [ "$VERBOSE" = "yes" ]; then
+        echo "$LOGSTASH_API_KEY" | /usr/share/logstash/bin/logstash-keystore \
+            --path.settings /etc/logstash \
+            add ELASTICSEARCH_API_KEY --stdin --force
+    else
+        echo "$LOGSTASH_API_KEY" | /usr/share/logstash/bin/logstash-keystore \
+            --path.settings /etc/logstash \
+            add ELASTICSEARCH_API_KEY --stdin --force >/dev/null 2>&1
+    fi
+    msg_verbose "  ✓ API key added to keystore"
+    msg_verbose "  → Setting keystore ownership and permissions..."
     chown logstash:root /etc/logstash/logstash.keystore
     chmod 0600 /etc/logstash/logstash.keystore
+    msg_verbose "  ✓ Keystore configured with secure permissions"
+    if [ "$VERBOSE" = "yes" ]; then
+        msg_verbose "  → Listing keystore keys:"
+        /usr/share/logstash/bin/logstash-keystore --path.settings /etc/logstash list
+    fi
     step_done "Configured Logstash Keystore"
 fi
 
@@ -685,6 +786,9 @@ step_start "Configuring Kibana Connection"
 if [ "${ENABLE_BACKEND_SSL:-true}" = "true" ]; then
     if [ "${ENABLE_FRONTEND_SSL:-true}" = "true" ]; then
         # Full HTTPS
+        msg_verbose "  → Configuring Kibana with full HTTPS (frontend + backend)..."
+        msg_verbose "  → Frontend SSL: Enabled (server.ssl.enabled: true)"
+        msg_verbose "  → Backend connection: https://[::1]:9200"
         cat >> /etc/kibana/kibana.yml << 'EOF'
 
 # HTTPS configuration
@@ -694,22 +798,31 @@ server.ssl.key: /etc/kibana/certs/instance.key
 elasticsearch.hosts: ["https://[::1]:9200"]
 elasticsearch.ssl.certificateAuthorities: ["/etc/kibana/certs/ca.crt"]
 EOF
+        msg_verbose "  ✓ Full HTTPS configuration written"
     else
         # Backend HTTPS only
+        msg_verbose "  → Configuring Kibana with backend HTTPS only..."
+        msg_verbose "  → Frontend SSL: Disabled (HTTP on port 5601)"
+        msg_verbose "  → Backend connection: https://[::1]:9200"
         cat >> /etc/kibana/kibana.yml << 'EOF'
 
 # Backend HTTPS only
 elasticsearch.hosts: ["https://[::1]:9200"]
 elasticsearch.ssl.certificateAuthorities: ["/etc/kibana/certs/ca.crt"]
 EOF
+        msg_verbose "  ✓ Backend HTTPS configuration written"
     fi
 else
     # No HTTPS
+    msg_verbose "  → Configuring Kibana without SSL (HTTP only)..."
+    msg_verbose "  → Frontend SSL: Disabled"
+    msg_verbose "  → Backend connection: http://[::1]:9200"
     cat >> /etc/kibana/kibana.yml << 'EOF'
 
 # No SSL
 elasticsearch.hosts: ["http://[::1]:9200"]
 EOF
+    msg_verbose "  ✓ No-SSL configuration written"
 fi
 step_done "Configured Kibana Connection"
 
@@ -717,6 +830,10 @@ step_done "Configured Kibana Connection"
 # Save Credentials
 # ----------------------------------------------------------------------------
 step_start "Saving Credentials"
+msg_verbose "  → Writing credentials to /root/elk-credentials.txt..."
+msg_verbose "  → Kibana URL: https://$(hostname -I | awk '{print $1}'):5601"
+msg_verbose "  → Username: elastic"
+msg_verbose "  → Password length: ${#ELASTIC_PASSWORD} characters"
 cat > /root/elk-credentials.txt << EOF
 ELK Stack Credentials
 =====================
