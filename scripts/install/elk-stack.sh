@@ -542,20 +542,24 @@ if [ "${ENABLE_BACKEND_SSL:-true}" = "true" ]; then
     msg_verbose "  → Creating certificate directories..."
     mkdir -p /etc/elasticsearch/certs
 
-    # Convert PEM to PKCS12 for Elasticsearch (no password)
+    # Generate password for PKCS12 keystores
+    msg_verbose "  → Generating password for PKCS12 keystores..."
+    ES_KEYSTORE_PASS=$(openssl rand -base64 32)
+    
+    # Convert PEM to PKCS12 for Elasticsearch with password
     msg_verbose "  → Converting certificates to PKCS12 format..."
     if [ "$VERBOSE" = "yes" ]; then
         openssl pkcs12 -export \
             -in /tmp/certs/instance/instance.crt \
             -inkey /tmp/certs/instance/instance.key \
             -out /etc/elasticsearch/certs/http.p12 \
-            -name "http" -passout pass:
+            -name "http" -passout pass:"$ES_KEYSTORE_PASS"
     else
         openssl pkcs12 -export \
             -in /tmp/certs/instance/instance.crt \
             -inkey /tmp/certs/instance/instance.key \
             -out /etc/elasticsearch/certs/http.p12 \
-            -name "http" -passout pass: 2>/dev/null
+            -name "http" -passout pass:"$ES_KEYSTORE_PASS" 2>/dev/null
     fi
     
     msg_verbose "  → Copying http.p12 to transport.p12..."
@@ -565,6 +569,40 @@ if [ "${ENABLE_BACKEND_SSL:-true}" = "true" ]; then
     msg_verbose "  → Setting Elasticsearch certificate permissions..."
     chown -R elasticsearch:elasticsearch /etc/elasticsearch/certs
     chmod 660 /etc/elasticsearch/certs/*.p12
+    
+    # Configure Elasticsearch keystore with PKCS12 password
+    msg_verbose "  → Configuring Elasticsearch keystore with PKCS12 passwords..."
+    if [ -f /usr/share/elasticsearch/bin/elasticsearch-keystore ]; then
+        # Ensure keystore exists
+        if [ ! -f /etc/elasticsearch/elasticsearch.keystore ]; then
+            if [ "$VERBOSE" = "yes" ]; then
+                /usr/share/elasticsearch/bin/elasticsearch-keystore create
+            else
+                /usr/share/elasticsearch/bin/elasticsearch-keystore create >/dev/null 2>&1
+            fi
+        fi
+        
+        # Add HTTP keystore password
+        msg_verbose "  → Adding HTTP keystore password..."
+        echo "$ES_KEYSTORE_PASS" | /usr/share/elasticsearch/bin/elasticsearch-keystore add \
+            xpack.security.http.ssl.keystore.secure_password --stdin --force >/dev/null 2>&1
+        
+        # Add transport keystore password (same password, same file)
+        msg_verbose "  → Adding transport keystore password..."
+        echo "$ES_KEYSTORE_PASS" | /usr/share/elasticsearch/bin/elasticsearch-keystore add \
+            xpack.security.transport.ssl.keystore.secure_password --stdin --force >/dev/null 2>&1
+        
+        # Add transport truststore password (same password, same file)
+        msg_verbose "  → Adding transport truststore password..."
+        echo "$ES_KEYSTORE_PASS" | /usr/share/elasticsearch/bin/elasticsearch-keystore add \
+            xpack.security.transport.ssl.truststore.secure_password --stdin --force >/dev/null 2>&1
+        
+        chown elasticsearch:elasticsearch /etc/elasticsearch/elasticsearch.keystore
+        chmod 660 /etc/elasticsearch/elasticsearch.keystore
+        msg_verbose "  ✓ Elasticsearch keystore configured with PKCS12 passwords"
+    else
+        msg_verbose "  ⚠ elasticsearch-keystore not found, skipping keystore configuration"
+    fi
 
     # Copy CA cert for Kibana and Logstash
     msg_verbose "  → Copying CA certificates to Kibana and Logstash..."
