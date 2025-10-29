@@ -3,7 +3,7 @@
 # License: Apache-2.0
 #
 # Build script for ELK Stack install wrapper
-# Generates out/install/elk-stack-install.sh that sources scripts/install-elk.sh
+# Generates out/install/elk-stack-install.sh that sources scripts/install/elk-stack.sh
 
 set -e
 
@@ -23,7 +23,7 @@ LOCAL_MODE="${LOCAL_MODE:-false}"
 if [ "$LOCAL_MODE" = "true" ]; then
     echo "Generating $OUT_FILE (embedded mode)..."
     
-    # Embed entire install-elk.sh
+    # Embed entire elk-stack.sh
     {
         echo "#!/usr/bin/env bash"
         echo ""
@@ -32,19 +32,17 @@ if [ "$LOCAL_MODE" = "true" ]; then
         echo "# License: Apache-2.0"
         echo "# Source: https://www.elastic.co/elk-stack"
         echo ""
-        echo "# Embedded install-elk.sh for local testing"
-        echo "# Runs in non-interactive mode by default"
+        echo "# Embedded elk-stack.sh for local testing"
+        echo "# NON_INTERACTIVE is set by lxc-attach environment (see ct-wrapper.sh)"
         echo ""
-        echo "export NON_INTERACTIVE=true"
-        echo ""
-        cat scripts/install-elk.sh | grep -v "^#!/usr/bin/env bash"
+        cat scripts/install/elk-stack.sh | grep -v "^#!/usr/bin/env bash"
     } > "$OUT_FILE"
     
 else
     echo "Generating $OUT_FILE (remote mode)..."
     
-    # Thin wrapper that downloads install-elk.sh
-    INSTALL_URL="$REPO_URL/$REPO_BRANCH/scripts/install-elk.sh"
+    # Thin wrapper that downloads elk-stack.sh
+    INSTALL_URL="$REPO_URL/$REPO_BRANCH/scripts/install/elk-stack.sh"
     
     cat > "$OUT_FILE" << 'EOF'
 #!/usr/bin/env bash
@@ -54,7 +52,7 @@ else
 # License: Apache-2.0
 # Source: https://www.elastic.co/elk-stack
 
-# Wrapper that downloads and executes install-elk.sh
+# Wrapper that downloads and executes elk-stack.sh
 source /dev/stdin <<<"$FUNCTIONS_FILE_PATH"
 color
 verb_ip6
@@ -74,4 +72,4 @@ chmod +x "$OUT_FILE"
 
 echo "✓ Generated $OUT_FILE successfully"
 echo "  Mode: $([ "$LOCAL_MODE" = "true" ] && echo "Embedded" || echo "Remote wrapper")"
-echo "  Source: $([ "$LOCAL_MODE" = "true" ] && echo "scripts/install-elk.sh (embedded)" || echo "$INSTALL_URL")"
+echo "  Source: $([ "$LOCAL_MODE" = "true" ] && echo "scripts/install/elk-stack.sh (embedded)" || echo "$INSTALL_URL")"

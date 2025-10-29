@@ -20,20 +20,25 @@ PROXMOX_LOCAL_PATH ?= /root/ProxmoxVE
 # Help is the interactive default
 .DEFAULT_GOAL := help
 
-# Template build target (runs scripts/build/build-template.sh)
+# Template build target (runs scripts/build/template.sh)
 .PHONY: template
 template:
-	bash scripts/build/build-template.sh
+	bash scripts/build/template.sh
 
 # Install target (generates all submission files)
 .PHONY: installer
 installer: dirs
 installer: $(CT_DIR)/elk-stack.sh $(INSTALL_DIR)/elk-stack-install.sh $(HEADER_DIR)/elk-stack $(JSON_DIR)/elk-stack.json
 
+# CT wrapper only target
+.PHONY: ct-wrapper
+ct-wrapper: dirs
+ct-wrapper: $(CT_DIR)/elk-stack.sh
+
 # Local mode installer (embeds everything)
 installer-local: export LOCAL_MODE=true
 installer-local: dirs
-installer-local: $(CT_DIR)/elk-stack.sh $(INSTALL_DIR)/elk-stack-install.sh $(HEADER_DIR)/elk-stack $(JSON_DIR)/elk-stack.json
+installer-local: $(CT_DIR)/elk-stack.sh
 
 # Create output directories
 .PHONY: dirs
@@ -42,12 +47,15 @@ dirs:
 
 # Default help target
 help:
-	@echo "ELK Stack LXC Template - Makefile"
+	@echo "ELK Stack LXC Template - Build System"
+	@echo ""
+	@echo "ENTRYPOINT: ./build.sh [target]"
 	@echo ""
 	@echo "Build Targets:"
 	@echo "  make installer              Build for ProxmoxVE submission (remote mode)"
+	@echo "  make ct-wrapper             Build CT wrapper only"
 	@echo "  make installer-local        Build for local testing (hybrid mode)"
-	@echo "  make template               Build LXC template (runs build-template.sh)"
+	@echo "  make template               Build LXC template"
 	@echo ""
 	@echo "Test Targets:"
 	@echo "  make test                   Run comprehensive test suite"
@@ -81,20 +89,23 @@ $(OUT_DIR):
 	@mkdir -p $(HEADER_DIR)
 	@mkdir -p $(JSON_DIR)
 
+# Generate install/elk-stack-install.sh (thin wrapper or embedded based on mode)
+# This must be built first, as CT wrapper depends on it
+$(INSTALL_DIR)/elk-stack-install.sh: $(OUT_DIR) scripts/install/elk-stack.sh scripts/build/installer.sh
+	@echo "Building installer..."
+	@REPO_URL=$(REPO_URL) REPO_BRANCH=$(REPO_BRANCH) LOCAL_MODE=$(LOCAL_MODE) bash scripts/build/installer.sh
+
 # Generate ct/elk-stack.sh (wrapper script)
-$(CT_DIR)/elk-stack.sh: $(OUT_DIR) templates/ct-wrapper.sh scripts/build/build-ct-wrapper.sh
+# Depends on installer being built first 
+$(CT_DIR)/elk-stack.sh: $(INSTALL_DIR)/elk-stack-install.sh templates/elk-stack-ct-content.sh scripts/build/ct-wrapper.sh scripts/build/lib/ct-local-mode.sh scripts/build/lib/ct-remote-mode.sh
 	@echo "Generating $(CT_DIR)/elk-stack.sh..."
 	@REPO_URL=$(REPO_URL) \
 	 REPO_BRANCH=$(REPO_BRANCH) \
 	 PROXMOX_REPO_URL=$(PROXMOX_REPO_URL) \
 	 PROXMOX_LOCAL_PATH=$(PROXMOX_LOCAL_PATH) \
 	 LOCAL_MODE=$(LOCAL_MODE) \
-	 bash scripts/build/build-ct-wrapper.sh
+	 bash scripts/build/ct-wrapper.sh
 	@echo "✓ Generated $(CT_DIR)/elk-stack.sh successfully"
-
-# Generate install/elk-stack-install.sh (thin wrapper or embedded based on mode)
-$(INSTALL_DIR)/elk-stack-install.sh: $(OUT_DIR) scripts/install-elk.sh scripts/build/build-installer.sh
-	@REPO_URL=$(REPO_URL) REPO_BRANCH=$(REPO_BRANCH) LOCAL_MODE=$(LOCAL_MODE) bash scripts/build/build-installer.sh
 
 # Generate ct/headers/elk-stack (ASCII art header)
 $(HEADER_DIR)/elk-stack: $(OUT_DIR) templates/header-ascii.txt
@@ -138,7 +149,12 @@ clean:
 # Validate component files exist
 check-components:
 	@echo "Checking component files..."
-	@test -f templates/ct-wrapper.sh || (echo "✗ Missing templates/ct-wrapper.sh" && exit 1)
-	@test -f scripts/install-elk.sh || (echo "✗ Missing scripts/install-elk.sh" && exit 1)
+	@test -f templates/elk-stack-ct-content.sh || (echo "✗ Missing templates/elk-stack-ct-content.sh" && exit 1)
+	@test -f templates/header-ascii.txt || (echo "✗ Missing templates/header-ascii.txt" && exit 1)
+	@test -f templates/ui-metadata.json || (echo "✗ Missing templates/ui-metadata.json" && exit 1)
+	@test -f scripts/install/elk-stack.sh || (echo "✗ Missing scripts/install/elk-stack.sh" && exit 1)
+	@test -f scripts/build/ct-wrapper.sh || (echo "✗ Missing scripts/build/ct-wrapper.sh" && exit 1)
+	@test -f scripts/build/installer.sh || (echo "✗ Missing scripts/build/installer.sh" && exit 1)
+	@test -f scripts/build/template.sh || (echo "✗ Missing scripts/build/template.sh" && exit 1)
 	@echo "✓ All components present"
 
