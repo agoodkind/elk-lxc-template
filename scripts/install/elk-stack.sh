@@ -84,6 +84,7 @@ if [ -z "$STD" ]; then
         echo "  NON_INTERACTIVE: ${NON_INTERACTIVE:-<not set>}"
         echo "  VERBOSE: ${VERBOSE:-<not set>}"
         echo "  var_verbose: ${var_verbose:-<not set>}"
+        echo "  DEBUG: ${DEBUG:-<not set>}"
         echo "  APPLICATION: ${APPLICATION:-<not set>}"
         echo "  app: ${app:-<not set>}"
         echo "  CTID: ${CTID:-<not set>}"
@@ -96,7 +97,7 @@ if [ -z "$STD" ]; then
 fi
 
 # Check if running interactively for memory customization
-if [ "${NON_INTERACTIVE:-false}" == "true" ]; then
+if [ "${NON_INTERACTIVE:-false}" = "true" ]; then
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo "NON-INTERACTIVE MODE (with verbose logging)"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -256,16 +257,9 @@ msg_verbose "  → Downloading packages (~2GB, may take 5-15 minutes)..."
 echo "$(date '+%Y-%m-%d %H:%M:%S') - Downloading ~2GB, \
 takes 5-15 minutes depending on network speed" | tee -a "$LOG_FILE"
 # Install all three ELK components
-if [ "$VERBOSE" = "yes" ]; then
-    if ! apt-get install -y elasticsearch logstash kibana; then
-        msg_error "Failed to install ELK Stack packages"
-        exit 1
-    fi
-else
-    if ! $STD apt-get install -y elasticsearch logstash kibana; then
-        msg_error "Failed to install ELK Stack packages"
-        exit 1
-    fi
+if ! DEBIAN_FRONTEND=noninteractive apt-get install -qq -y elasticsearch logstash kibana ; then
+    msg_error "Failed to install ELK Stack packages"
+    exit 1
 fi
 step_done "Installed ELK Stack (Elasticsearch, Logstash, Kibana)"
 
@@ -308,13 +302,12 @@ msg_verbose "  → Configuring Logstash JVM heap size..."
 
 # Configure heap size
 cat > /etc/logstash/jvm.options.d/heap.options << EOF
-
 # JVM heap settings for Logstash
 -Xms${LS_HEAP_GB:-1}g
 -Xmx${LS_HEAP_GB:-1}g
 EOF
 
-# Note: Pipelines will be configured based on SSL choice
+# Note: Pipelines are configured for HTTPS with API key authentication
 # Users can add custom pipelines to /etc/logstash/conf.d/ after installation
 step_done "Deployed Logstash Configuration"
 
@@ -714,6 +707,3 @@ ELK Stack installation completed successfully" \
     | tee -a "$LOG_FILE"
 echo "Installation log saved to: $LOG_FILE (inside container)" \
     | tee -a "$LOG_FILE"
-
-# Clean up temporary configuration files
-rm -rf /tmp/elk-config
