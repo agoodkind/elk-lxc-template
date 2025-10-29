@@ -266,8 +266,30 @@ step_done "Prepared Elasticsearch Directories"
 step_start "Deploying Elasticsearch Configuration"
 msg_verbose "  → Writing Elasticsearch configuration to /etc/elasticsearch/elasticsearch.yml..."
 
-# Append to default elasticsearch.yml
+# Comment out default settings that we'll override to avoid duplicates
+msg_verbose "  → Removing default settings to avoid duplicates..."
+sed -i 's/^xpack.security.enabled:/#&/' /etc/elasticsearch/elasticsearch.yml
+sed -i 's/^xpack.security.enrollment.enabled:/#&/' /etc/elasticsearch/elasticsearch.yml
+sed -i 's/^xpack.security.http.ssl.enabled:/#&/' /etc/elasticsearch/elasticsearch.yml
+sed -i 's/^xpack.security.http.ssl.keystore.path:/#&/' /etc/elasticsearch/elasticsearch.yml
+sed -i 's/^xpack.security.http.ssl.key:/#&/' /etc/elasticsearch/elasticsearch.yml
+sed -i 's/^xpack.security.transport.ssl.enabled:/#&/' /etc/elasticsearch/elasticsearch.yml
+sed -i 's/^xpack.security.transport.ssl.keystore.path:/#&/' /etc/elasticsearch/elasticsearch.yml
+sed -i 's/^xpack.security.transport.ssl.truststore.path:/#&/' /etc/elasticsearch/elasticsearch.yml
+sed -i 's/^xpack.security.transport.ssl.verification_mode:/#&/' /etc/elasticsearch/elasticsearch.yml
+sed -i 's/^cluster.name:/#&/' /etc/elasticsearch/elasticsearch.yml
+sed -i 's/^node.name:/#&/' /etc/elasticsearch/elasticsearch.yml
+sed -i 's/^network.host:/#&/' /etc/elasticsearch/elasticsearch.yml
+sed -i 's/^http.port:/#&/' /etc/elasticsearch/elasticsearch.yml
+sed -i 's/^cluster.initial_master_nodes:/#&/' /etc/elasticsearch/elasticsearch.yml
+
+# Append our configuration
+msg_verbose "  → Appending custom configuration..."
 cat >> /etc/elasticsearch/elasticsearch.yml << 'EOF'
+
+# ============================================================================
+# Custom ELK Stack Configuration
+# ============================================================================
 
 # Elasticsearch network configuration
 # Prefer IPv6 and listen on all interfaces
@@ -332,8 +354,21 @@ step_done "Deployed Logstash Configuration"
 step_start "Deploying Kibana Configuration"
 msg_verbose "  → Writing Kibana configuration to /etc/kibana/kibana.yml..."
 
-# Append to default kibana.yml
+# Comment out default settings that we'll override to avoid duplicates
+msg_verbose "  → Removing default settings to avoid duplicates..."
+sed -i 's/^server.port:/#&/' /etc/kibana/kibana.yml
+sed -i 's/^server.host:/#&/' /etc/kibana/kibana.yml
+sed -i 's/^elasticsearch.hosts:/#&/' /etc/kibana/kibana.yml
+sed -i 's/^elasticsearch.username:/#&/' /etc/kibana/kibana.yml
+sed -i 's/^elasticsearch.password:/#&/' /etc/kibana/kibana.yml
+
+# Append our configuration
+msg_verbose "  → Appending custom configuration..."
 cat >> /etc/kibana/kibana.yml << 'EOF'
+
+# ============================================================================
+# Custom Kibana Configuration
+# ============================================================================
 
 # Kibana server configuration
 server.port: 5601
@@ -486,11 +521,16 @@ if [ "${ENABLE_BACKEND_SSL:-true}" = "true" ]; then
     step_done "Generated SSL Certificates"
 else
     step_start "Disabling SSL"
+    msg_verbose "  → Updating Elasticsearch configuration to disable SSL..."
     # Update Elasticsearch config to disable SSL
-    sed -i 's/xpack.security.http.ssl.enabled: true/xpack.security.enabled: false/' \
+    sed -i 's/^xpack.security.enabled: true/xpack.security.enabled: false/' \
         /etc/elasticsearch/elasticsearch.yml
-    sed -i '/xpack.security.http.ssl.keystore.path/d' /etc/elasticsearch/elasticsearch.yml
-    sed -i '/xpack.security.transport.ssl/d' /etc/elasticsearch/elasticsearch.yml
+    sed -i 's/^xpack.security.http.ssl.enabled: true/#&/' /etc/elasticsearch/elasticsearch.yml
+    sed -i 's/^xpack.security.http.ssl.keystore.path:/#&/' /etc/elasticsearch/elasticsearch.yml
+    sed -i 's/^xpack.security.transport.ssl.enabled: true/#&/' /etc/elasticsearch/elasticsearch.yml
+    sed -i 's/^xpack.security.transport.ssl.keystore.path:/#&/' /etc/elasticsearch/elasticsearch.yml
+    sed -i 's/^xpack.security.transport.ssl.truststore.path:/#&/' /etc/elasticsearch/elasticsearch.yml
+    sed -i 's/^xpack.security.transport.ssl.verification_mode:/#&/' /etc/elasticsearch/elasticsearch.yml
     step_done "Disabled SSL"
 fi
 
