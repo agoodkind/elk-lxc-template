@@ -47,6 +47,11 @@ msg_verbose() {
     fi
 }
 
+# Enable verbose mode automatically in NON_INTERACTIVE mode
+if [ "${NON_INTERACTIVE:-false}" = "true" ] && [ "${VERBOSE:-no}" = "no" ]; then
+    VERBOSE=yes
+fi
+
 # Set STD if not already defined (Proxmox framework sets this)
 if [ -z "$STD" ]; then
     if [ "${VERBOSE}" = "yes" ] || [ "${var_verbose}" = "yes" ]; then
@@ -55,6 +60,7 @@ if [ -z "$STD" ]; then
         echo "VERBOSE MODE ENABLED"
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
         echo "Environment Variables:"
+        echo "  NON_INTERACTIVE: ${NON_INTERACTIVE:-<not set>}"
         echo "  VERBOSE: ${VERBOSE:-<not set>}"
         echo "  var_verbose: ${var_verbose:-<not set>}"
         echo "  APPLICATION: ${APPLICATION:-<not set>}"
@@ -72,7 +78,17 @@ fi
 if [ -z "$SSL_CHOICE" ]; then
   # Check for non-interactive mode
   if [ "${NON_INTERACTIVE:-false}" = "true" ]; then
-    echo "${TAB3}Running in non-interactive mode - using defaults"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "NON-INTERACTIVE MODE (with verbose logging)"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "Using default configuration:"
+    echo "  → SSL Choice: 1 (Full HTTPS - Elasticsearch + Kibana)"
+    echo "  → Elasticsearch Heap: 2GB"
+    echo "  → Logstash Heap: 1GB"
+    echo "  → Verbose logging: Enabled"
+    echo "  → Self-signed certificates: Will be generated"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo ""
     SSL_CHOICE=1
     CUSTOMIZE_MEMORY=no
   else
@@ -130,6 +146,13 @@ else
   ES_HEAP_GB=2
   LS_HEAP_GB=1
 fi
+
+msg_verbose "Final configuration:"
+msg_verbose "  → SSL Backend: ${ENABLE_BACKEND_SSL}"
+msg_verbose "  → SSL Frontend: ${ENABLE_FRONTEND_SSL}"
+msg_verbose "  → Elasticsearch Heap: ${ES_HEAP_GB}GB"
+msg_verbose "  → Logstash Heap: ${LS_HEAP_GB}GB"
+msg_verbose ""
 
 echo
 
