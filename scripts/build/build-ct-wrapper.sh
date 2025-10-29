@@ -61,7 +61,30 @@ if [ "$LOCAL_MODE" = "true" ]; then
         echo ""
         echo 'chmod +x "$HOST_SCRIPT"'
         echo 'pct push "$CTID" "$HOST_SCRIPT" /tmp/install-elk.sh --perms 755'
-        echo 'lxc-attach -n "$CTID" -- /tmp/install-elk.sh'
+        echo ''
+        echo '# Pass all exported environment variables to container'
+        cat <<'EOF'
+lxc-attach -n "$CTID" -- bash -c "
+  export VERBOSE='$VERBOSE'
+  export DIAGNOSTICS='$DIAGNOSTICS'
+  export RANDOM_UUID='$RANDOM_UUID'
+  export CACHER='$CACHER'
+  export CACHER_IP='$CACHER_IP'
+  export tz='$tz'
+  export APPLICATION='$APPLICATION'
+  export app='$app'
+  export PASSWORD='$PASSWORD'
+  export SSH_ROOT='$SSH_ROOT'
+  export SSH_AUTHORIZED_KEY='$SSH_AUTHORIZED_KEY'
+  export CTID='$CTID'
+  export CTTYPE='$CTTYPE'
+  export ENABLE_FUSE='$ENABLE_FUSE'
+  export ENABLE_TUN='$ENABLE_TUN'
+  export PCT_OSTYPE='$PCT_OSTYPE'
+  export PCT_OSVERSION='$PCT_OSVERSION'
+  /tmp/install-elk.sh
+"
+EOF
         echo 'pct exec "$CTID" -- rm -f /tmp/install-elk.sh'
         echo 'rm -f "$HOST_SCRIPT"'
         echo ""
