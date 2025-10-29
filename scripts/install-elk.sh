@@ -9,10 +9,10 @@
 # (Elasticsearch, Logstash, Kibana) on Ubuntu 24.04.
 # It works in two modes:
 #
-# 1. Standalone mode (build.sh): Self-contained with built-in
-#    logging
-# 2. Proxmox community script (out/install.sh): Uses framework's
-#    msg_* functions
+# Execution Modes:
+# 1. Proxmox community script: Inherits framework's msg_* and $STD functions
+# 2. Template build: Pre-set variables (SSL_CHOICE, etc.) for non-interactive install
+# 3. Standalone: Uses fallback shims for msg_* and silent() functions
 #
 # The shim pattern allows the same installation logic to work
 # in both contexts.
