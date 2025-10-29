@@ -1,0 +1,57 @@
+{
+    "name": "ELK-Stack",
+    "slug": "elk-stack",
+    "categories": [
+        17
+    ],
+    "date_created": "2025-10-28",
+    "type": "ct",
+    "updateable": true,
+    "privileged": false,
+    "config_path": "/etc/elasticsearch",
+    "interface_port": 5601,
+    "documentation": "https://www.elastic.co/guide/en/elastic-stack/current/index.html",
+    "website": "https://www.elastic.co/elk-stack",
+    "logo": "https://static-www.elastic.co/v3/assets/bltefdd0b53724fa2ce/blt0090c6239e64faf8/62aa0980c949fd5059e8aebc/logo-stack-32-color.svg",
+    "description": "The ELK Stack (Elasticsearch, Logstash, Kibana) is a powerful open-source platform for searching, analyzing, and visualizing log data in real time. Elasticsearch provides distributed search and analytics, Logstash collects and processes data, and Kibana offers interactive visualization and exploration.",
+    "install_methods": [
+        {
+            "type": "default",
+            "script": "ct/elk-stack.sh",
+            "resources": {
+                "cpu": 4,
+                "ram": 8192,
+                "hdd": 32,
+                "os": "ubuntu",
+                "version": "24.04"
+            }
+        }
+    ],
+    "default_credentials": {
+        "username": null,
+        "password": null
+    },
+    "notes": [
+        {
+            "text": "Installation downloads ~2GB of packages and takes 10-20 minutes. Please be patient!",
+            "type": "warning"
+        },
+        {
+            "text": "Interactive prompts will ask for SSL configuration (Full HTTPS/Backend only/No SSL) and memory settings during installation.",
+            "type": "info"
+        },
+        {
+            "text": "After installation, retrieve credentials with: pct exec CONTAINER_ID -- cat /root/elk-credentials.txt",
+            "type": "warning"
+        },
+        {
+            "text": "Default heap sizes: Elasticsearch 2GB, Logstash 1GB. Configurable during installation.",
+            "type": "info"
+        },
+        {
+            "text": "Unique elastic password generated, API keys created for Kibana and Logstash, SSL certificates auto-configured based on your choices.",
+            "type": "info"
+        }
+    ]
+}
+
