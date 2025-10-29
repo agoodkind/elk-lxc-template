@@ -70,6 +70,21 @@ msg_error() {
     else
         echo "✗ ERROR: $*"
     fi
+    
+    # In verbose mode, show last ~100 lines of Elasticsearch log if available
+    if [ "${VERBOSE}" = "yes" ] || [ "${var_verbose}" = "yes" ]; then
+        local app_name="${app:-${APPLICATION:-elasticsearch}}"
+        local es_log="/var/log/elasticsearch/${app_name}.log"
+        if [ -f "$es_log" ]; then
+            echo ""
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "Last ~100 lines of Elasticsearch log ($es_log):"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            tail -n 100 "$es_log" 2>/dev/null || echo "  (unable to read log file)"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo ""
+        fi
+    fi
 }
 
 # Set STD if not already defined (Proxmox framework sets this)
@@ -267,8 +282,6 @@ step_done "Installed ELK Stack (Elasticsearch, Logstash, Kibana)"
 # Prepare Elasticsearch Directories
 # ----------------------------------------------------------------------------
 step_start "Preparing Elasticsearch Directories"
-msg_debug "Existing JVM options" /etc/elasticsearch/jvm.options
-msg_debug "Existing elasticsearch.yml" /etc/elasticsearch/elasticsearch.yml
 mkdir -p /etc/elasticsearch/jvm.options.d
 step_done "Prepared Elasticsearch Directories"
 
@@ -278,7 +291,7 @@ step_done "Prepared Elasticsearch Directories"
 # We don't touch elasticsearch.yml before startup - let auto-config handle everything
 # Network settings will be configured after auto-config completes
 step_start "Configuring Elasticsearch JVM Heap"
-
+msg_debug "Existing jvm.options.d/heap.options" /etc/elasticsearch/jvm.options.d/heap.options
 cat > /etc/elasticsearch/jvm.options.d/heap.options << EOF
 # JVM heap settings for Elasticsearch
 -Xms${ES_HEAP_GB:-2}g
@@ -299,7 +312,7 @@ step_done "Prepared Logstash Directories"
 # ----------------------------------------------------------------------------
 step_start "Deploying Logstash Configuration"
 msg_verbose "  → Configuring Logstash JVM heap size..."
-
+msg_debug "Existing jvm.options.d/heap.options" /etc/logstash/jvm.options.d/heap.options
 # Configure heap size
 cat > /etc/logstash/jvm.options.d/heap.options << EOF
 # JVM heap settings for Logstash
@@ -315,6 +328,7 @@ step_done "Deployed Logstash Configuration"
 # Deploy Kibana Configuration
 # ----------------------------------------------------------------------------
 step_start "Deploying Kibana Configuration"
+msg_debug "Existing kibana.yml" /etc/kibana/kibana.yml
 msg_verbose "  → Writing Kibana configuration to /etc/kibana/kibana.yml..."
 
 # Comment out default settings that we'll override to avoid duplicates
