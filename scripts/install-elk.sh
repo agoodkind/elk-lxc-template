@@ -38,7 +38,7 @@ TAB3="${TAB3:-   }"
 if [ "${VERB}" = "yes" ] || [ "${var_verbose}" = "yes" ]; then
     STD=""  # Verbose mode: show all output
 else
-    STD=" &>/dev/null"  # Quiet mode: suppress output
+    STD="&>/dev/null"  # Quiet mode: suppress output
 fi
 
 # Check if running interactively or if variables pre-set (template build mode)
