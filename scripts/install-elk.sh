@@ -56,15 +56,11 @@ msg_error() {
     fi
 }
 
-# Enable verbose mode automatically in NON_INTERACTIVE mode
-if [ "${NON_INTERACTIVE:-false}" = "true" ] && [ "${VERBOSE:-no}" = "no" ]; then
-    VERBOSE=yes
-fi
-
 # Set STD if not already defined (Proxmox framework sets this)
 if [ -z "$STD" ]; then
     if [ "${VERBOSE}" = "yes" ] || [ "${var_verbose}" = "yes" ]; then
         STD=""  # Verbose mode: show all output
+
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
         echo "VERBOSE MODE ENABLED"
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -86,7 +82,7 @@ fi
 # Check if running interactively or if variables pre-set (template build mode)
 if [ -z "$SSL_CHOICE" ]; then
   # Check for non-interactive mode
-  if [ "${NON_INTERACTIVE:-false}" = "true" ]; then
+  if [ "${NON_INTERACTIVE:-false}" == "true" ]; then
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo "NON-INTERACTIVE MODE (with verbose logging)"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -110,6 +106,7 @@ if [ -z "$SSL_CHOICE" ]; then
     echo "${TAB3}[1] Full HTTPS (Elasticsearch + Kibana) [Recommended]"
     echo "${TAB3}[2] Backend only (Elasticsearch HTTPS, Kibana HTTP)"
     echo "${TAB3}[3] No SSL (HTTP only - testing/dev)"
+
     read -rp "${TAB3}Enter your choice (default: 1): " SSL_CHOICE </dev/tty
     SSL_CHOICE=${SSL_CHOICE:-1}
   fi
