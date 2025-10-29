@@ -58,7 +58,7 @@ if [ -z "$SSL_CHOICE" ]; then
   echo "${TAB3}[1] Full HTTPS (Elasticsearch + Kibana) [Recommended]"
   echo "${TAB3}[2] Backend only (Elasticsearch HTTPS, Kibana HTTP)"
   echo "${TAB3}[3] No SSL (HTTP only - testing/dev)"
-  read -rp "${TAB3}Enter your choice (default: 1): " SSL_CHOICE
+  read -rp "${TAB3}Enter your choice (default: 1): " SSL_CHOICE </dev/tty
   SSL_CHOICE=${SSL_CHOICE:-1}
 fi
 
@@ -84,18 +84,18 @@ esac
 
 if [ -z "$CUSTOMIZE_MEMORY" ]; then
   echo
-  read -rp "${TAB3}Customize JVM heap sizes? (default: Elasticsearch 2GB, Logstash 1GB) [y/N]: " CUSTOMIZE_MEMORY
+  read -rp "${TAB3}Customize JVM heap sizes? (default: Elasticsearch 2GB, Logstash 1GB) [y/N]: " CUSTOMIZE_MEMORY </dev/tty
 fi
 
 if [[ ${CUSTOMIZE_MEMORY,,} =~ ^(y|yes)$ ]]; then
   if [ -z "$ES_HEAP_GB" ]; then
     echo "${TAB3}Memory Configuration:"
-    read -rp "${TAB3}Elasticsearch heap size in GB (default: 2): " ES_HEAP_GB
+    read -rp "${TAB3}Elasticsearch heap size in GB (default: 2): " ES_HEAP_GB </dev/tty
   fi
   ES_HEAP_GB=${ES_HEAP_GB:-2}
   
   if [ -z "$LS_HEAP_GB" ]; then
-    read -rp "${TAB3}Logstash heap size in GB (default: 1): " LS_HEAP_GB
+    read -rp "${TAB3}Logstash heap size in GB (default: 1): " LS_HEAP_GB </dev/tty
   fi
   LS_HEAP_GB=${LS_HEAP_GB:-1}
 else

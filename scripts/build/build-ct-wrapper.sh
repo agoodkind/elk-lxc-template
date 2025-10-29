@@ -51,12 +51,19 @@ if [ "$LOCAL_MODE" = "true" ]; then
         sed -n '/{{BUILD_FUNC_SOURCE}}/,/{{INSTALL_SCRIPT_OVERRIDE}}/p' templates/ct-wrapper.sh \
             | sed '1d;$d'
         
-        # 4. Embedded install script
+        # 4. Embedded install script (write to host temp, push to container, execute)
         echo ""
         echo "# Execute embedded install script (local testing mode)"
-        echo "lxc-attach -n \"\$CTID\" -- bash << 'INSTALL_SCRIPT_EOF'"
+        echo "HOST_SCRIPT=\"/tmp/elk-install-\$\$.sh\""
+        echo "cat > \"\$HOST_SCRIPT\" << 'INSTALL_SCRIPT_EOF'"
         cat scripts/install-elk.sh
         echo "INSTALL_SCRIPT_EOF"
+        echo ""
+        echo 'chmod +x "$HOST_SCRIPT"'
+        echo 'pct push "$CTID" "$HOST_SCRIPT" /tmp/install-elk.sh --perms 755'
+        echo 'lxc-attach -n "$CTID" -- /tmp/install-elk.sh'
+        echo 'pct exec "$CTID" -- rm -f /tmp/install-elk.sh'
+        echo 'rm -f "$HOST_SCRIPT"'
         echo ""
         
         # 5. Rest of ct-wrapper (after {{INSTALL_SCRIPT_OVERRIDE}})
