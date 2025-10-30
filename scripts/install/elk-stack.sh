@@ -633,7 +633,7 @@ msg_verbose "  → Adding Logstash API key to keystore (ELASTICSEARCH_API_KEY)..
 
 echo "$LOGSTASH_API_KEY" | /usr/share/logstash/bin/logstash-keystore \
     --path.settings /etc/logstash \
-    add ELASTICSEARCH_API_KEY --stdin --force
+    add ELASTICSEARCH_API_KEY --stdin
 
 msg_verbose "  ✓ API key added to keystore"
 msg_verbose "  → Setting keystore ownership and permissions..."
@@ -655,11 +655,11 @@ cat > /etc/logstash/conf.d/30-output.conf << 'EOF'
 # Logstash output configuration (HTTPS with API key)
 output {
 	elasticsearch {
-		hosts => ["https://[::1]:9200"]
+		hosts => ["https://localhost:9200"]
 		api_key => "${ELASTICSEARCH_API_KEY}"
 		index => "%{[@metadata][beat]}-%{[@metadata][version]}-%{+YYYY.MM.dd}"
-		ssl => true
-		cacert => "/etc/logstash/certs/ca.crt"
+		ssl_enabled => true
+        ssl_certificate_authorities => ["/etc/logstash/certs/http_ca.crt"]
 	}
 }
 EOF
