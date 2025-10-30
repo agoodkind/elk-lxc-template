@@ -560,6 +560,7 @@ msg_verbose "  → Auto-generating password for elastic user..."
 
 # Use auto-generate mode (-a) with batch mode (-b) to avoid password echo
 RESET_OUTPUT=$(/usr/share/elasticsearch/bin/elasticsearch-reset-password -u elastic -a -b 2>&1)
+msg_debug "Reset output: $RESET_OUTPUT"
 
 if [ $? -ne 0 ]; then
     msg_error "Failed to reset elastic user password"
@@ -567,12 +568,12 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-# Extract password from output (format: "New value: PASSWORD")
-ELASTIC_PASSWORD=$(echo "$RESET_OUTPUT" | grep "New value:" | awk '{print $NF}')
+# Extract password from output (case-insensitive for "new value")
+ELASTIC_PASSWORD=$(echo "$RESET_OUTPUT" | grep -i "new value" | awk '{print $NF}')
 
 if [ -z "$ELASTIC_PASSWORD" ]; then
+
     msg_error "Failed to extract password from reset output"
-    msg_verbose "  → Output: $RESET_OUTPUT"
     exit 1
 fi
 
@@ -587,9 +588,11 @@ msg_verbose "  → Verifying password authentication..."
 MAX_AUTH_WAIT=30
 AUTH_WAIT=0
 while [ $AUTH_WAIT -lt $MAX_AUTH_WAIT ]; do
+    
     AUTH_TEST=$(curl $CURL_OPTS -s -u "elastic:$ELASTIC_PASSWORD" \
         -X GET "$ES_URL/_security/_authenticate" 2>&1)
     msg_debug "Auth test response: $AUTH_TEST"
+
     if echo "$AUTH_TEST" | grep -q '"username":"elastic"'; then
         msg_verbose "  ✓ Password verified successfully"
         break
@@ -604,6 +607,7 @@ if [ $AUTH_WAIT -ge $MAX_AUTH_WAIT ]; then
     exit 1
 fi
 
+msg_verbose "  ✓ Authentication verified"
 step_done "Generated Elastic Password"
 
 # ----------------------------------------------------------------------------
@@ -615,6 +619,7 @@ msg_verbose "  → Creating enrollment token for Kibana..."
 # Generate new enrollment token (initial token was created during first startup
 # but only shown on terminal; we generate a new one since it's short-lived)
 ENROLLMENT_TOKEN=$(/usr/share/elasticsearch/bin/elasticsearch-create-enrollment-token -s kibana)
+msg_debug "Enrollment token: $ENROLLMENT_TOKEN"
 
 if [ -z "$ENROLLMENT_TOKEN" ]; then
     msg_error "Failed to generate Kibana enrollment token"
@@ -631,8 +636,66 @@ if ! /usr/share/kibana/bin/kibana-setup --enrollment-token "$ENROLLMENT_TOKEN"; 
     exit 1
 fi
 
-msg_verbose "  ✓ Enrollment token applied (Kibana auto-configured)"
+msg_verbose "  ✓ Enrollment token applied (Kibana backend configured)"
 step_done "Configured Kibana with Enrollment Token"
+
+# ----------------------------------------------------------------------------
+# Configure Kibana Frontend HTTPS
+# ----------------------------------------------------------------------------
+step_start "Configuring Kibana Frontend HTTPS"
+msg_verbose "  → Extracting PEM certificates from http.p12..."
+
+# Get keystore password
+HTTP_KEYSTORE_PASS=$(/usr/share/elasticsearch/bin/elasticsearch-keystore show \
+    xpack.security.http.ssl.keystore.secure_password 2>/dev/null)
+
+if [ -z "$HTTP_KEYSTORE_PASS" ]; then
+    msg_error "Could not retrieve http.p12 password from Elasticsearch keystore"
+    exit 1
+fi
+
+# Extract certificate (cert.pem)
+echo "$HTTP_KEYSTORE_PASS" | openssl pkcs12 -in /etc/elasticsearch/certs/http.p12 \
+    -clcerts -nokeys -passin stdin 2>/dev/null | \
+    openssl x509 -out /etc/kibana/cert.pem 2>/dev/null
+
+# Extract private key (privkey.pem)
+echo "$HTTP_KEYSTORE_PASS" | openssl pkcs12 -in /etc/elasticsearch/certs/http.p12 \
+    -nocerts -nodes -passin stdin 2>/dev/null | \
+    openssl rsa -out /etc/kibana/privkey.pem 2>/dev/null
+
+# Verify extraction
+if [ ! -f /etc/kibana/cert.pem ] || [ ! -f /etc/kibana/privkey.pem ]; then
+    msg_error "Failed to extract PEM certificates from http.p12"
+    exit 1
+fi
+
+# Set ownership and permissions
+chown kibana:kibana /etc/kibana/cert.pem /etc/kibana/privkey.pem
+chmod 640 /etc/kibana/cert.pem /etc/kibana/privkey.pem
+
+# Update Elasticsearch connection to use localhost (enrollment token uses IP)
+msg_verbose "  → Updating elasticsearch.hosts to use localhost..."
+sed -i 's|elasticsearch.hosts:.*|elasticsearch.hosts: [https://localhost:9200]|' /etc/kibana/kibana.yml
+
+# Configure Kibana frontend SSL
+cat >> /etc/kibana/kibana.yml << 'EOF'
+
+# Frontend HTTPS configuration (using certs from Elasticsearch http.p12)
+server.ssl.enabled: true
+server.ssl.certificate: /etc/kibana/cert.pem
+server.ssl.key: /etc/kibana/privkey.pem
+EOF
+
+msg_verbose "  ✓ Kibana frontend HTTPS configured"
+
+# Restart Kibana to apply changes
+msg_verbose "  → Restarting Kibana to apply SSL and localhost configuration..."
+$STD systemctl restart kibana
+sleep 5
+
+msg_verbose "  ✓ Kibana restarted with HTTPS enabled"
+step_done "Configured Kibana Frontend HTTPS"
 
 # ----------------------------------------------------------------------------
 # Create Logstash API Key
@@ -642,11 +705,15 @@ msg_verbose "  → Defining Logstash writer role with permissions for logs-*, lo
 LOGSTASH_ROLE='{"name":"logstash_writer","role_descriptors":{"logstash_writer":{"cluster":["monitor","manage_index_templates","manage_ilm"],"indices":[{"names":["logs-*","logstash-*","ecs-*"],"privileges":["write","create","create_index","manage","manage_ilm"]}]}}}'
 msg_verbose "  → Creating API key via Elasticsearch API..."
 msg_verbose "  → Endpoint: $ES_URL/_security/api_key"
+
 LOGSTASH_KEY_RESPONSE=$(curl $CURL_OPTS -s -X POST \
     "$ES_URL/_security/api_key" \
     -u "elastic:$ELASTIC_PASSWORD" \
     -H "Content-Type: application/json" \
     -d "$LOGSTASH_ROLE")
+
+msg_debug "Logstash key response: $LOGSTASH_KEY_RESPONSE"
+
 LOGSTASH_API_KEY=$(echo "$LOGSTASH_KEY_RESPONSE" | grep -o '"encoded":"[^"]*' | cut -d'"' -f4)
 
 if [ -z "$LOGSTASH_API_KEY" ]; then
@@ -665,15 +732,11 @@ step_done "Created Logstash API Key"
 # ----------------------------------------------------------------------------
 step_start "Configuring Logstash Keystore"
 msg_verbose "  → Adding Logstash API key to keystore (ELASTICSEARCH_API_KEY)..."
-if [ "$VERBOSE" = "yes" ]; then
-    echo "$LOGSTASH_API_KEY" | /usr/share/logstash/bin/logstash-keystore \
-        --path.settings /etc/logstash \
-        add ELASTICSEARCH_API_KEY --stdin --force
-else
-    echo "$LOGSTASH_API_KEY" | /usr/share/logstash/bin/logstash-keystore \
-        --path.settings /etc/logstash \
-        add ELASTICSEARCH_API_KEY --stdin --force >/dev/null 2>&1
-fi
+
+echo "$LOGSTASH_API_KEY" | /usr/share/logstash/bin/logstash-keystore \
+    --path.settings /etc/logstash \
+    add ELASTICSEARCH_API_KEY --stdin --force
+
 msg_verbose "  ✓ API key added to keystore"
 msg_verbose "  → Setting keystore ownership and permissions..."
 chown logstash:root /etc/logstash/logstash.keystore
