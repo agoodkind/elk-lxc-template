@@ -559,13 +559,39 @@ step_start "Generating Elastic Password"
 msg_verbose "  → Generating random password for elastic user..."
 ELASTIC_PASSWORD=$(tr -dc A-Za-z0-9 </dev/urandom | head -c 20)
 msg_verbose "  → Resetting elastic user password..."
-if [ "$VERBOSE" = "yes" ]; then
-    echo "$ELASTIC_PASSWORD" | /usr/share/elasticsearch/bin/elasticsearch-reset-password \
-        -u elastic -b -s
-else
-    echo "$ELASTIC_PASSWORD" | /usr/share/elasticsearch/bin/elasticsearch-reset-password \
-        -u elastic -b -s >/dev/null 2>&1
+
+# Reset password using batch mode with stdin
+if ! echo "$ELASTIC_PASSWORD" | /usr/share/elasticsearch/bin/elasticsearch-reset-password \
+    -u elastic -b -s; then
+    msg_error "Failed to reset elastic user password"
+    exit 1
 fi
+
+# Wait for password to propagate
+msg_verbose "  → Waiting for password to propagate..."
+sleep 5
+
+# Verify authentication works
+msg_verbose "  → Verifying password authentication..."
+MAX_AUTH_WAIT=30
+AUTH_WAIT=0
+while [ $AUTH_WAIT -lt $MAX_AUTH_WAIT ]; do
+    AUTH_TEST=$(curl $CURL_OPTS -s -u "elastic:$ELASTIC_PASSWORD" \
+        -X GET "$ES_URL/_security/_authenticate" 2>&1)
+    if echo "$AUTH_TEST" | grep -q '"username":"elastic"'; then
+        msg_verbose "  ✓ Password verified successfully"
+        break
+    fi
+    sleep 2
+    AUTH_WAIT=$((AUTH_WAIT + 2))
+done
+
+if [ $AUTH_WAIT -ge $MAX_AUTH_WAIT ]; then
+    msg_error "Password reset completed but authentication verification failed"
+    msg_verbose "  → Auth test response: $AUTH_TEST"
+    exit 1
+fi
+
 step_done "Generated Elastic Password"
 
 # ----------------------------------------------------------------------------
@@ -593,16 +619,9 @@ msg_verbose "  ✓ Enrollment token created (length: ${#ENROLLMENT_TOKEN} chars)
 
 # Use kibana-setup to apply enrollment token non-interactively
 msg_verbose "  → Applying enrollment token to Kibana configuration..."
-if [ "$VERBOSE" = "yes" ]; then
-    if ! /usr/share/kibana/bin/kibana-setup --enrollment-token "$ENROLLMENT_TOKEN"; then
-        msg_error "Failed to apply enrollment token to Kibana"
-        exit 1
-    fi
-else
-    if ! /usr/share/kibana/bin/kibana-setup --enrollment-token "$ENROLLMENT_TOKEN" >/dev/null 2>&1; then
-        msg_error "Failed to apply enrollment token to Kibana"
-        exit 1
-    fi
+if ! /usr/share/kibana/bin/kibana-setup --enrollment-token "$ENROLLMENT_TOKEN"; then
+    msg_error "Failed to apply enrollment token to Kibana"
+    exit 1
 fi
 
 msg_verbose "  ✓ Enrollment token applied (Kibana auto-configured)"
