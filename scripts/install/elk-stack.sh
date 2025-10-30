@@ -585,12 +585,12 @@ msg_verbose "  ✓ Enrollment token created (length: ${#ENROLLMENT_TOKEN} chars)
 # Use kibana-setup to apply enrollment token non-interactively
 msg_verbose "  → Applying enrollment token to Kibana configuration..."
 if [ "$VERBOSE" = "yes" ]; then
-    if ! echo "$ENROLLMENT_TOKEN" | /usr/share/kibana/bin/kibana-setup --enrollment-token; then
+    if ! /usr/share/kibana/bin/kibana-setup --enrollment-token "$ENROLLMENT_TOKEN"; then
         msg_error "Failed to apply enrollment token to Kibana"
         exit 1
     fi
 else
-    if ! echo "$ENROLLMENT_TOKEN" | /usr/share/kibana/bin/kibana-setup --enrollment-token >/dev/null 2>&1; then
+    if ! /usr/share/kibana/bin/kibana-setup --enrollment-token "$ENROLLMENT_TOKEN" >/dev/null 2>&1; then
         msg_error "Failed to apply enrollment token to Kibana"
         exit 1
     fi
