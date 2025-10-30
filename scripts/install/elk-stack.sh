@@ -556,16 +556,27 @@ CURL_OPTS="-k"
 # Generate Elastic Password (always needed - security is always enabled)
 # ----------------------------------------------------------------------------
 step_start "Generating Elastic Password"
-msg_verbose "  → Generating random password for elastic user..."
-ELASTIC_PASSWORD=$(tr -dc A-Za-z0-9 </dev/urandom | head -c 20)
-msg_verbose "  → Resetting elastic user password..."
+msg_verbose "  → Auto-generating password for elastic user..."
 
-# Reset password using batch mode with stdin
-if ! echo "$ELASTIC_PASSWORD" | /usr/share/elasticsearch/bin/elasticsearch-reset-password \
-    -u elastic -b -s; then
+# Use auto-generate mode (-a) with batch mode (-b) to avoid password echo
+RESET_OUTPUT=$(/usr/share/elasticsearch/bin/elasticsearch-reset-password -u elastic -a -b 2>&1)
+
+if [ $? -ne 0 ]; then
     msg_error "Failed to reset elastic user password"
+    msg_verbose "  → Output: $RESET_OUTPUT"
     exit 1
 fi
+
+# Extract password from output (format: "New value: PASSWORD")
+ELASTIC_PASSWORD=$(echo "$RESET_OUTPUT" | grep "New value:" | awk '{print $NF}')
+
+if [ -z "$ELASTIC_PASSWORD" ]; then
+    msg_error "Failed to extract password from reset output"
+    msg_verbose "  → Output: $RESET_OUTPUT"
+    exit 1
+fi
+
+msg_verbose "  ✓ Password generated (length: ${#ELASTIC_PASSWORD} chars)"
 
 # Wait for password to propagate
 msg_verbose "  → Waiting for password to propagate..."
@@ -578,6 +589,7 @@ AUTH_WAIT=0
 while [ $AUTH_WAIT -lt $MAX_AUTH_WAIT ]; do
     AUTH_TEST=$(curl $CURL_OPTS -s -u "elastic:$ELASTIC_PASSWORD" \
         -X GET "$ES_URL/_security/_authenticate" 2>&1)
+    msg_debug "Auth test response: $AUTH_TEST"
     if echo "$AUTH_TEST" | grep -q '"username":"elastic"'; then
         msg_verbose "  ✓ Password verified successfully"
         break
