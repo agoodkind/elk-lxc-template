@@ -49,11 +49,12 @@ description
 
 msg_ok "Completed Successfully!\n"
 echo -e "${CREATING}${GN}${APP} setup has been successfully initialized!${CL}"
-echo -e "${INFO}${YW} Services configured with interactive prompts during installation${CL}"
+echo -e "${INFO}${YW} Security and SSL auto-configured by Elasticsearch${CL}"
 echo -e "${INFO}${YW} View credentials:${CL}"
-# TODO update these messagings and fix  CTID and IP not properly replaced
-echo -e "${TAB}${GATEWAY}${BGN}pct exec \$CTID -- cat /root/elk-credentials.txt${CL}"
+echo -e "${TAB}${GATEWAY}${BGN}pct exec $CTID -- cat /root/elk-credentials.txt${CL}"
+echo -e "${INFO}${YW} Installation log:${CL}"
+echo -e "${TAB}${GATEWAY}${BGN}pct exec $CTID -- cat /tmp/elk-install.log${CL}"
 echo -e "${INFO}${YW} Access Kibana:${CL}"
 echo -e "${TAB}${GATEWAY}${BGN}https://\${IP}:5601${CL}"
-echo -e "${INFO}${YW} (or http if you chose No SSL during installation)${CL}"
-
+echo -e "${INFO}To turn on HTTPS: edit /etc/kibana/kibana.yml and change server.ssl.enabled to true${CL}"
+echo -e "${INFO}Then restart Kibana: pct exec $CTID -- systemctl restart kibana${CL}"
