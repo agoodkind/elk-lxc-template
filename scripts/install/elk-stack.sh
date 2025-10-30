@@ -275,7 +275,10 @@ step_done "Added Elastic Repository"
 # ----------------------------------------------------------------------------
 step_start "Updating Package Lists"
 # Update package list to include Elastic repository
-$STD apt-get update
+if ! DEBIAN_FRONTEND=noninteractive apt-get update -qq; then
+    msg_error "Failed to update package lists"
+    exit 1
+fi
 step_done "Updated Package Lists"
 
 # ----------------------------------------------------------------------------
