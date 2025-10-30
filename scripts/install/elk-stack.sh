@@ -600,14 +600,9 @@ step_done "Generated Elastic Password"
 step_start "Configuring Kibana with Enrollment Token"
 msg_verbose "  → Creating enrollment token for Kibana..."
 
-# Generate enrollment token (auto-config creates these)
-if [ ! -f /usr/share/elasticsearch/bin/elasticsearch-create-enrollment-token ]; then
-    msg_error "elasticsearch-create-enrollment-token not found (auto-config may not have run)"
-    msg_verbose "  → Ensure Elasticsearch auto-config ran on first startup"
-    exit 1
-fi
-
-ENROLLMENT_TOKEN=$(/usr/share/elasticsearch/bin/elasticsearch-create-enrollment-token -s kibana 2>/dev/null || echo "")
+# Generate new enrollment token (initial token was created during first startup
+# but only shown on terminal; we generate a new one since it's short-lived)
+ENROLLMENT_TOKEN=$(/usr/share/elasticsearch/bin/elasticsearch-create-enrollment-token -s kibana)
 
 if [ -z "$ENROLLMENT_TOKEN" ]; then
     msg_error "Failed to generate Kibana enrollment token"
