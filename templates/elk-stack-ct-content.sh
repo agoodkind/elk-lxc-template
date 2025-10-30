@@ -50,25 +50,23 @@ description
 msg_ok "Completed Successfully!\n"
 echo -e "${CREATING}${GN}${APP} setup has been successfully initialized!${CL}"
 echo -e ""
-echo -e "${INFO}${YW} View Credentials:${CL}"
-echo -e "${TAB}${GATEWAY}${BGN}pct exec $CTID -- cat /root/elk-credentials.txt${CL}"
-echo -e ""
-echo -e "${INFO}${YW} Access Kibana (HTTP):${CL}"
-echo -e "${TAB}${GATEWAY}${BGN}http://\${IP}:5601${CL}"
-echo -e "${TAB}${YW}Note: Backend connection to Elasticsearch is secured via HTTPS${CL}"
-echo -e ""
-echo -e "${INFO}${YW} Enable Kibana Frontend HTTPS:${CL}"
-echo -e "${TAB}${YW}1. Extract certificates from Elasticsearch's http.p12:${CL}"
-echo -e "${TAB}${GATEWAY}${BGN}pct exec $CTID -- bash -c 'PASS=\$(/usr/share/elasticsearch/bin/elasticsearch-keystore show xpack.security.http.ssl.keystore.secure_password) && \\${CL}"
-echo -e "${TAB}${GATEWAY}${BGN}echo \"\$PASS\" | openssl pkcs12 -in /etc/elasticsearch/certs/http.p12 -clcerts -nokeys -passin stdin | openssl x509 -out /etc/kibana/cert.pem && \\${CL}"
-echo -e "${TAB}${GATEWAY}${BGN}echo \"\$PASS\" | openssl pkcs12 -in /etc/elasticsearch/certs/http.p12 -nocerts -nodes -passin stdin | openssl rsa -out /etc/kibana/privkey.pem && \\${CL}"
-echo -e "${TAB}${GATEWAY}${BGN}chown kibana:kibana /etc/kibana/*.pem && chmod 640 /etc/kibana/*.pem'${CL}"
-echo -e "${TAB}${YW}2. Add to /etc/kibana/kibana.yml:${CL}"
-echo -e "${TAB}${GATEWAY}${BGN}server.ssl.enabled: true${CL}"
-echo -e "${TAB}${GATEWAY}${BGN}server.ssl.certificate: /etc/kibana/cert.pem${CL}"
-echo -e "${TAB}${GATEWAY}${BGN}server.ssl.key: /etc/kibana/privkey.pem${CL}"
-echo -e "${TAB}${YW}3. Restart Kibana:${CL}"
-echo -e "${TAB}${GATEWAY}${BGN}pct exec $CTID -- systemctl restart kibana${CL}"
-echo -e ""
-echo -e "${INFO}${YW} Installation Log:${CL}"
-echo -e "${TAB}${GATEWAY}${BGN}pct exec $CTID -- cat /tmp/elk-install.log${CL}"
+
+# Get IP if not already set by description() function
+if [ -z "${IP:-}" ]; then
+  IP=$(pct exec "$CTID" ip a s dev eth0 | awk '/inet / {print $2}' | cut -d/ -f1)
+fi
+
+echo -e "${INFO}${YW} Credentials: ${GATEWAY}${BGN}pct exec $CTID -- cat /root/elk-credentials.txt${CL}"
+echo -e "${INFO}${YW} Kibana:      ${GATEWAY}${BGN}http://${IP}:5601${CL}"
+echo -e "${INFO}${YW} Logs:        ${GATEWAY}${BGN}pct exec $CTID -- cat /tmp/elk-install.log${CL}"
+echo
+echo -e "${INFO}${YW} Instructions to turn on HTTPS:${CL}"
+echo "1. Put your own certificate and key in /etc/kibana/certs/ca.crt and /etc/kibana/certs/ca.key"
+echo "2. Edit /etc/kibana/kibana.yml" and add the following:
+echo
+echo "  server.ssl.enabled: true"
+echo "  server.ssl.certificate: /etc/kibana/certs/ca.crt"
+echo "  server.ssl.key: /etc/kibana/certs/ca.key"
+echo "  server.port: 443 # (optional, default is 5601)"
+echo
+echo "3. Restart Kibana: pct exec $CTID -- systemctl restart kibana"
