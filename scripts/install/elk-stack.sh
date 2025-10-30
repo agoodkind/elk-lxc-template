@@ -600,7 +600,7 @@ step_done "Configured Kibana"
 # ----------------------------------------------------------------------------
 step_start "Creating Logstash API Key"
 msg_verbose "  → Defining Logstash writer role with permissions for logs-*, logstash-*, ecs-*"
-LOGSTASH_ROLE='{"name":"logstash_writer","role_descriptors":{"logstash_writer":{"cluster":["monitor","manage_index_templates","manage_ilm"],"indices":[{"names":["logs-*","logstash-*","ecs-*"],"privileges":["write","create","create_index","manage","manage_ilm"]}]}}}'
+LOGSTASH_ROLE='{"name":"logstash_writer","role_descriptors":{"logstash_writer":{"cluster":["monitor","manage_index_templates","manage_ilm"],"indices":[{"names":["logs-*","logstash-*","ecs-*"],"privileges":["write","create","create_index","manage","manage_ilm","auto_configure"]}]}}}'
 msg_verbose "  → Creating API key via Elasticsearch API..."
 msg_verbose "  → Endpoint: $ES_URL/_security/api_key"
 
@@ -657,9 +657,9 @@ output {
 	elasticsearch {
 		hosts => ["https://localhost:9200"]
 		api_key => "${ELASTICSEARCH_API_KEY}"
-		index => "%{[@metadata][beat]}-%{[@metadata][version]}-%{+YYYY.MM.dd}"
+	    data_stream => true
 		ssl_enabled => true
-        ssl_certificate_authorities => ["/etc/logstash/certs/http_ca.crt"]
+        ssl_certificate_authorities => ["/etc/logstash/certs/ca.crt"]
 	}
 }
 EOF
