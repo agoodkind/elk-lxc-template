@@ -203,23 +203,23 @@ fi
 
 if [ -z "$CUSTOMIZE_MEMORY" ] && [ "${NON_INTERACTIVE:-false}" != "true" ]; then
     echo
-    read -rp "${TAB3}Customize JVM heap sizes? (default: Elasticsearch 8GB, Logstash 4GB) [y/N]: " CUSTOMIZE_MEMORY </dev/tty
+    read -rp "${TAB3}Customize JVM heap sizes? (default: Elasticsearch 4GB, Logstash 2GB) [y/N]: " CUSTOMIZE_MEMORY </dev/tty
 fi
 
 if [[ ${CUSTOMIZE_MEMORY,,} =~ ^(y|yes)$ ]]; then
   if [ -z "$ES_HEAP_GB" ]; then
     echo "${TAB3}Memory Configuration:"
-    read -rp "${TAB3}Elasticsearch heap size in GB (default: 8): " ES_HEAP_GB </dev/tty
+    read -rp "${TAB3}Elasticsearch heap size in GB (default: 4): " ES_HEAP_GB </dev/tty
   fi
-  ES_HEAP_GB=${ES_HEAP_GB:-8}
+  ES_HEAP_GB=${ES_HEAP_GB:-4}
   
   if [ -z "$LS_HEAP_GB" ]; then
-    read -rp "${TAB3}Logstash heap size in GB (default: 4): " LS_HEAP_GB </dev/tty
+    read -rp "${TAB3}Logstash heap size in GB (default: 2): " LS_HEAP_GB </dev/tty
   fi
-  LS_HEAP_GB=${LS_HEAP_GB:-4}
+  LS_HEAP_GB=${LS_HEAP_GB:-2}
 else
-  ES_HEAP_GB=8
-  LS_HEAP_GB=4
+  ES_HEAP_GB=4
+  LS_HEAP_GB=2
 fi
 
 msg_verbose "Final configuration:"
