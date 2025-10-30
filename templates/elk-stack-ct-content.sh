@@ -51,6 +51,7 @@ msg_ok "Completed Successfully!\n"
 echo -e "${CREATING}${GN}${APP} setup has been successfully initialized!${CL}"
 echo -e "${INFO}${YW} Services configured with interactive prompts during installation${CL}"
 echo -e "${INFO}${YW} View credentials:${CL}"
+# TODO update these messagings and fix  CTID and IP not properly replaced
 echo -e "${TAB}${GATEWAY}${BGN}pct exec \$CTID -- cat /root/elk-credentials.txt${CL}"
 echo -e "${INFO}${YW} Access Kibana:${CL}"
 echo -e "${TAB}${GATEWAY}${BGN}https://\${IP}:5601${CL}"
