@@ -193,8 +193,8 @@ if [ "${NON_INTERACTIVE:-false}" = "true" ]; then
     echo "Using default configuration:"
     echo "  → Security: Enabled (Elasticsearch auto-configured)"
     echo "  → SSL: Enabled (auto-generated certificates)"
-    echo "  → Elasticsearch Heap: 2GB"
-    echo "  → Logstash Heap: 1GB"
+    echo "  → Elasticsearch Heap: 8GB"
+    echo "  → Logstash Heap: 4GB"
     echo "  → Verbose logging: Enabled"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo ""
@@ -202,24 +202,24 @@ if [ "${NON_INTERACTIVE:-false}" = "true" ]; then
 fi
 
 if [ -z "$CUSTOMIZE_MEMORY" ] && [ "${NON_INTERACTIVE:-false}" != "true" ]; then
-  echo
-  read -rp "${TAB3}Customize JVM heap sizes? (default: Elasticsearch 2GB, Logstash 1GB) [y/N]: " CUSTOMIZE_MEMORY </dev/tty
+    echo
+    read -rp "${TAB3}Customize JVM heap sizes? (default: Elasticsearch 8GB, Logstash 4GB) [y/N]: " CUSTOMIZE_MEMORY </dev/tty
 fi
 
 if [[ ${CUSTOMIZE_MEMORY,,} =~ ^(y|yes)$ ]]; then
   if [ -z "$ES_HEAP_GB" ]; then
     echo "${TAB3}Memory Configuration:"
-    read -rp "${TAB3}Elasticsearch heap size in GB (default: 2): " ES_HEAP_GB </dev/tty
+    read -rp "${TAB3}Elasticsearch heap size in GB (default: 8): " ES_HEAP_GB </dev/tty
   fi
-  ES_HEAP_GB=${ES_HEAP_GB:-2}
+  ES_HEAP_GB=${ES_HEAP_GB:-8}
   
   if [ -z "$LS_HEAP_GB" ]; then
-    read -rp "${TAB3}Logstash heap size in GB (default: 1): " LS_HEAP_GB </dev/tty
+    read -rp "${TAB3}Logstash heap size in GB (default: 4): " LS_HEAP_GB </dev/tty
   fi
-  LS_HEAP_GB=${LS_HEAP_GB:-1}
+  LS_HEAP_GB=${LS_HEAP_GB:-4}
 else
-  ES_HEAP_GB=2
-  LS_HEAP_GB=1
+  ES_HEAP_GB=8
+  LS_HEAP_GB=4
 fi
 
 msg_verbose "Final configuration:"
@@ -350,38 +350,8 @@ EOF
 # Users can add custom pipelines to /etc/logstash/conf.d/ after installation
 step_done "Deployed Logstash Configuration"
 
-# ----------------------------------------------------------------------------
-# Deploy Kibana Configuration
-# ----------------------------------------------------------------------------
-step_start "Deploying Kibana Configuration"
-msg_debug "Existing kibana.yml" /etc/kibana/kibana.yml
-msg_verbose "  → Writing Kibana configuration to /etc/kibana/kibana.yml..."
-
-# Comment out default settings that we'll override to avoid duplicates
-msg_verbose "  → Removing default settings to avoid duplicates..."
-sed -i 's/^server.port:/#&/' /etc/kibana/kibana.yml
-sed -i 's/^server.host:/#&/' /etc/kibana/kibana.yml
-sed -i 's/^elasticsearch.hosts:/#&/' /etc/kibana/kibana.yml
-sed -i 's/^elasticsearch.username:/#&/' /etc/kibana/kibana.yml
-sed -i 's/^elasticsearch.password:/#&/' /etc/kibana/kibana.yml
-
-# Append our configuration
-msg_verbose "  → Appending custom configuration..."
-cat >> /etc/kibana/kibana.yml << 'EOF'
-
-# ============================================================================
-# Custom Kibana Configuration
-# ============================================================================
-
-# Kibana server configuration
-server.port: 5601
-# Prefer IPv6 and listen on all interfaces
-server.host: "::"
-
-# Elasticsearch connection will be auto-configured via enrollment token
-# (kibana-setup will add elasticsearch.hosts, SSL settings, and authentication)
-EOF
-step_done "Deployed Kibana Configuration"
+# Kibana configuration is deferred until after Elasticsearch starts
+# (consolidated with enrollment token and SSL setup below)
 
 # ----------------------------------------------------------------------------
 # Generate Keystore Passwords
@@ -607,13 +577,33 @@ msg_verbose "  ✓ Authentication verified"
 step_done "Generated Elastic Password"
 
 # ----------------------------------------------------------------------------
-# Configure Kibana with Enrollment Token
+# Configure Kibana (consolidated: basic config + enrollment)
 # ----------------------------------------------------------------------------
-step_start "Configuring Kibana with Enrollment Token"
-msg_verbose "  → Creating enrollment token for Kibana..."
+step_start "Configuring Kibana"
+msg_debug "Existing kibana.yml" /etc/kibana/kibana.yml
 
-# Generate new enrollment token (initial token was created during first startup
-# but only shown on terminal; we generate a new one since it's short-lived)
+# Configure basic server settings
+msg_verbose "  → Configuring Kibana server settings..."
+sed -i 's/^server.port:/#&/' /etc/kibana/kibana.yml
+sed -i 's/^server.host:/#&/' /etc/kibana/kibana.yml
+sed -i 's/^elasticsearch.hosts:/#&/' /etc/kibana/kibana.yml
+sed -i 's/^elasticsearch.username:/#&/' /etc/kibana/kibana.yml
+sed -i 's/^elasticsearch.password:/#&/' /etc/kibana/kibana.yml
+
+cat >> /etc/kibana/kibana.yml << 'EOF'
+
+# ============================================================================
+# Kibana Configuration
+# ============================================================================
+
+# Kibana server configuration
+server.port: 5601
+# Prefer IPv6 and listen on all interfaces
+server.host: "::"
+EOF
+
+# Generate and apply enrollment token
+msg_verbose "  → Creating enrollment token for Kibana..."
 ENROLLMENT_TOKEN=$(/usr/share/elasticsearch/bin/elasticsearch-create-enrollment-token -s kibana)
 msg_debug "Enrollment token: $ENROLLMENT_TOKEN"
 
@@ -625,19 +615,18 @@ if [ -z "$ENROLLMENT_TOKEN" ]; then
 fi
 msg_verbose "  ✓ Enrollment token created (length: ${#ENROLLMENT_TOKEN} chars)"
 
-# Use kibana-setup to apply enrollment token non-interactively
-msg_verbose "  → Applying enrollment token to Kibana configuration..."
+msg_verbose "  → Applying enrollment token (configures backend connection to Elasticsearch)..."
 if ! /usr/share/kibana/bin/kibana-setup --enrollment-token "$ENROLLMENT_TOKEN"; then
     msg_error "Failed to apply enrollment token to Kibana"
     exit 1
 fi
 
-# Update Elasticsearch connection to use localhost (enrollment token uses IP)
+# Update Elasticsearch connection to use localhost instead of IP
 msg_verbose "  → Updating elasticsearch.hosts to use localhost..."
 sed -i 's|elasticsearch.hosts:.*|elasticsearch.hosts: [https://localhost:9200]|' /etc/kibana/kibana.yml
 
-msg_verbose "  ✓ Enrollment token applied (Kibana backend configured)"
-step_done "Configured Kibana with Enrollment Token"
+msg_verbose "  ✓ Kibana backend configured (HTTPS to Elasticsearch via localhost)"
+step_done "Configured Kibana"
 
 # ----------------------------------------------------------------------------
 # Create Logstash API Key
