@@ -61,6 +61,7 @@ echo -e "${INFO}${YW} Kibana:      ${GATEWAY}${BGN}http://${IP}:5601${CL}"
 echo -e "${INFO}${YW} Logs:        ${GATEWAY}${BGN}pct exec $CTID -- cat /tmp/elk-install.log${CL}"
 echo
 echo -e "${INFO}${YW} Instructions to turn on HTTPS:${CL}"
+echo
 echo "1. Put your own certificate and key in /etc/kibana/certs/ca.crt and /etc/kibana/certs/ca.key"
 echo "2. Edit /etc/kibana/kibana.yml" and add the following:
 echo
@@ -70,3 +71,10 @@ echo "  server.ssl.key: /etc/kibana/certs/ca.key"
 echo "  server.port: 443 # (optional, default is 5601)"
 echo
 echo "3. Restart Kibana: pct exec $CTID -- systemctl restart kibana"
+echo
+# Users can add custom pipelines to /etc/logstash/conf.d/ after installation
+echo -e "${INFO}${YW} Put your custom pipelines in:${CL}"
+echo "  /etc/logstash/conf.d/"
+echo -e "${INFO}${YW} Restart Logstash:${CL}"
+echo "  pct exec $CTID -- systemctl restart logstash"
+echo
