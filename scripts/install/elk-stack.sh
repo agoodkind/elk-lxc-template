@@ -570,18 +570,12 @@ fi
 
 # Extract password from output (case-insensitive for "new value")
 ELASTIC_PASSWORD=$(echo "$RESET_OUTPUT" | grep -i "new value" | awk '{print $NF}')
-
+msg_debug "Extracted password: $ELASTIC_PASSWORD"
 if [ -z "$ELASTIC_PASSWORD" ]; then
-
     msg_error "Failed to extract password from reset output"
     exit 1
 fi
-
 msg_verbose "  ✓ Password generated (length: ${#ELASTIC_PASSWORD} chars)"
-
-# Wait for password to propagate
-msg_verbose "  → Waiting for password to propagate..."
-sleep 5
 
 # Verify authentication works
 msg_verbose "  → Verifying password authentication..."
@@ -636,66 +630,12 @@ if ! /usr/share/kibana/bin/kibana-setup --enrollment-token "$ENROLLMENT_TOKEN"; 
     exit 1
 fi
 
-msg_verbose "  ✓ Enrollment token applied (Kibana backend configured)"
-step_done "Configured Kibana with Enrollment Token"
-
-# ----------------------------------------------------------------------------
-# Configure Kibana Frontend HTTPS
-# ----------------------------------------------------------------------------
-step_start "Configuring Kibana Frontend HTTPS"
-msg_verbose "  → Extracting PEM certificates from http.p12..."
-
-# Get keystore password
-HTTP_KEYSTORE_PASS=$(/usr/share/elasticsearch/bin/elasticsearch-keystore show \
-    xpack.security.http.ssl.keystore.secure_password 2>/dev/null)
-
-if [ -z "$HTTP_KEYSTORE_PASS" ]; then
-    msg_error "Could not retrieve http.p12 password from Elasticsearch keystore"
-    exit 1
-fi
-
-# Extract certificate (cert.pem)
-echo "$HTTP_KEYSTORE_PASS" | openssl pkcs12 -in /etc/elasticsearch/certs/http.p12 \
-    -clcerts -nokeys -passin stdin 2>/dev/null | \
-    openssl x509 -out /etc/kibana/cert.pem 2>/dev/null
-
-# Extract private key (privkey.pem)
-echo "$HTTP_KEYSTORE_PASS" | openssl pkcs12 -in /etc/elasticsearch/certs/http.p12 \
-    -nocerts -nodes -passin stdin 2>/dev/null | \
-    openssl rsa -out /etc/kibana/privkey.pem 2>/dev/null
-
-# Verify extraction
-if [ ! -f /etc/kibana/cert.pem ] || [ ! -f /etc/kibana/privkey.pem ]; then
-    msg_error "Failed to extract PEM certificates from http.p12"
-    exit 1
-fi
-
-# Set ownership and permissions
-chown kibana:kibana /etc/kibana/cert.pem /etc/kibana/privkey.pem
-chmod 640 /etc/kibana/cert.pem /etc/kibana/privkey.pem
-
 # Update Elasticsearch connection to use localhost (enrollment token uses IP)
 msg_verbose "  → Updating elasticsearch.hosts to use localhost..."
 sed -i 's|elasticsearch.hosts:.*|elasticsearch.hosts: [https://localhost:9200]|' /etc/kibana/kibana.yml
 
-# Configure Kibana frontend SSL
-cat >> /etc/kibana/kibana.yml << 'EOF'
-
-# Frontend HTTPS configuration (using certs from Elasticsearch http.p12)
-server.ssl.enabled: true
-server.ssl.certificate: /etc/kibana/cert.pem
-server.ssl.key: /etc/kibana/privkey.pem
-EOF
-
-msg_verbose "  ✓ Kibana frontend HTTPS configured"
-
-# Restart Kibana to apply changes
-msg_verbose "  → Restarting Kibana to apply SSL and localhost configuration..."
-$STD systemctl restart kibana
-sleep 5
-
-msg_verbose "  ✓ Kibana restarted with HTTPS enabled"
-step_done "Configured Kibana Frontend HTTPS"
+msg_verbose "  ✓ Enrollment token applied (Kibana backend configured)"
+step_done "Configured Kibana with Enrollment Token"
 
 # ----------------------------------------------------------------------------
 # Create Logstash API Key
@@ -775,7 +715,7 @@ step_done "Configured Logstash Output"
 # Save Credentials
 # ----------------------------------------------------------------------------
 step_start "Saving Credentials"
-KIBANA_URL="https://$(hostname -I | awk '{print $1}'):5601"
+KIBANA_URL="http://$(hostname -I | awk '{print $1}'):5601"
 
 msg_verbose "  → Writing credentials to /root/elk-credentials.txt..."
 msg_verbose "  → Kibana URL: $KIBANA_URL"
@@ -826,11 +766,3 @@ echo "" | tee -a "$LOG_FILE"
 echo "$(date '+%Y-%m-%d %H:%M:%S') - \
 ELK Stack installation completed successfully" \
     | tee -a "$LOG_FILE"
-
-# Print log file location prominently
-echo ""
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "Installation Log: $LOG_FILE"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-msg_info "View credentials: cat /root/elk-credentials.txt"
-msg_info "Access Kibana: $KIBANA_URL"
