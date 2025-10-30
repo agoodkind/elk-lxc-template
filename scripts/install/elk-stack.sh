@@ -230,8 +230,6 @@ msg_verbose ""
 
 echo
 
-# Configuration is now embedded inline (no external files needed)
-
 # ============================================================================
 # INSTALLATION STEPS
 # ============================================================================
@@ -294,9 +292,6 @@ step_done "Updated Package Lists"
 # ----------------------------------------------------------------------------
 step_start "Installing ELK Stack (Elasticsearch, Logstash, Kibana)"
 msg_verbose "  → Downloading packages (~2GB, may take 5-15 minutes)..."
-# Log download information
-echo "$(date '+%Y-%m-%d %H:%M:%S') - Downloading ~2GB, \
-takes 5-15 minutes depending on network speed" | tee -a "$LOG_FILE"
 # Install all three ELK components
 if ! DEBIAN_FRONTEND=noninteractive apt-get install -qq -y elasticsearch logstash kibana ; then
     msg_error "Failed to install ELK Stack packages"
