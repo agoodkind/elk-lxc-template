@@ -167,8 +167,10 @@ if [ -z "$STD" ]; then
         echo "  var_verbose: ${var_verbose:-<not set>}"
         echo "  DEBUG: ${DEBUG:-<not set>}"
         echo "  APPLICATION: ${APPLICATION:-<not set>}"
-        echo "  app: ${app:-<not set>}"
+        echo "  APP: ${APP:-<not set>}"
+        echo "  NSAPP: ${NSAPP:-<not set>}"
         echo "  CTID: ${CTID:-<not set>}"
+        echo "  IP: ${IP:-<not set>}"
         echo "  STD: ${STD:-<empty/verbose>}"
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
         echo ""
@@ -513,14 +515,14 @@ sed -i 's/^network.host:/#&/' /etc/elasticsearch/elasticsearch.yml
 sed -i 's/^cluster.name:/#&/' /etc/elasticsearch/elasticsearch.yml
 
 # Now that auto-config has completed, add our network settings
-# Use APPLICATION variable for cluster name (follows Proxmox patterns)
-CLUSTER_NAME="${APPLICATION:-ELK-Stack}"
+# Use NSAPP variable for cluster name (follows Proxmox patterns)
+CLUSTER_NAME="${NSAPP:-ELK-Stack}"
 cat >> /etc/elasticsearch/elasticsearch.yml << EOF
 
 # Network configuration (added after auto-config)
 network.host: ["_local_", "_site_"]
 
-# Cluster identification (uses APPLICATION variable)
+# Cluster identification (uses NSAPP variable)
 cluster.name: ${CLUSTER_NAME}
 EOF
 

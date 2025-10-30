@@ -45,7 +45,7 @@
             "type": "info"
         },
         {
-            "text": "After installation, get credentials with: pct exec CONTAINER_ID -- cat /root/elk-credentials.txt",
+            "text": "After installation, get credentials with: pct exec <CONTAINER_ID> -- cat /root/elk-credentials.txt",
             "type": "warning"
         },
         {
@@ -53,7 +53,7 @@
             "type": "info"
         },
         {
-            "text": "Access Kibana at https://CONTAINER_IP:5601 (or http if you chose No SSL). Username: elastic, password in credentials file.",
+            "text": "Access Kibana at http://<CONTAINER_IP>:5601. Username: elastic, password in credentials file.",
             "type": "info"
         }
     ]
