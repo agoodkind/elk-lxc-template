@@ -40,6 +40,57 @@ if ! command -v silent &> /dev/null; then
     }
 fi
 
+# ============================================================================
+# LOGGING SETUP
+# ============================================================================
+
+# Initialize logging (if not already set by caller)
+# Proxmox framework will define LOG_FILE, standalone mode uses default
+LOG_FILE="${LOG_FILE:-/tmp/elk-install.log}"
+if [ ! -f "$LOG_FILE" ]; then
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - \
+Starting ELK Stack installation" | tee "$LOG_FILE"
+    echo "Installation log: $LOG_FILE" | tee -a "$LOG_FILE"
+fi
+
+# ============================================================================
+# SHIM FUNCTIONS
+# ============================================================================
+# These functions provide a consistent interface for both execution modes.
+# Proxmox framework defines these in install-header.sh with colored output.
+# Standalone mode defines simple versions here with logging.
+
+# Display informational message at start of installation step
+if ! command -v msg_info &> /dev/null; then
+    msg_info() {
+        echo "" | tee -a "$LOG_FILE"
+        echo "▶ $1" | tee -a "$LOG_FILE"
+    }
+fi
+
+# Display success message at end of installation step
+if ! command -v msg_ok &> /dev/null; then
+    msg_ok() {
+        echo "✓ $1" | tee -a "$LOG_FILE"
+    }
+fi
+
+# ============================================================================
+# STEP WRAPPER FUNCTIONS
+# ============================================================================
+# Wrapper functions that auto-increment step counter and format messages
+
+# Start a new installation step
+step_start() {
+    STEP=$((STEP + 1))
+    msg_info "[$STEP] $1"
+}
+
+# Complete an installation step
+step_done() {
+    msg_ok "[$STEP] ${1:-Completed}"
+}
+
 # Define verbose logging function
 msg_verbose() {
     if [ "${VERBOSE}" = "yes" ] || [ "${var_verbose}" = "yes" ]; then
@@ -121,6 +172,12 @@ if [ -z "$STD" ]; then
         echo "  STD: ${STD:-<empty/verbose>}"
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
         echo ""
+
+        msg_debug "Debug Message Test" 
+        msg_error "Error Message Test"
+        msg_verbose "Verbose Message Test"
+        msg_info "Info Message Test"
+        msg_ok "OK Message Test"
     else
         STD="silent"  # Quiet mode: use silent function
     fi
@@ -170,57 +227,6 @@ msg_verbose "  → Logstash Heap: ${LS_HEAP_GB}GB"
 msg_verbose ""
 
 echo
-
-# ============================================================================
-# LOGGING SETUP
-# ============================================================================
-
-# Initialize logging (if not already set by caller)
-# Proxmox framework will define LOG_FILE, standalone mode uses default
-LOG_FILE="${LOG_FILE:-/tmp/elk-install.log}"
-if [ ! -f "$LOG_FILE" ]; then
-    echo "$(date '+%Y-%m-%d %H:%M:%S') - \
-Starting ELK Stack installation" | tee "$LOG_FILE"
-    echo "Installation log: $LOG_FILE" | tee -a "$LOG_FILE"
-fi
-
-# ============================================================================
-# SHIM FUNCTIONS
-# ============================================================================
-# These functions provide a consistent interface for both execution modes.
-# Proxmox framework defines these in install-header.sh with colored output.
-# Standalone mode defines simple versions here with logging.
-
-# Display informational message at start of installation step
-if ! command -v msg_info &> /dev/null; then
-    msg_info() {
-        echo "" | tee -a "$LOG_FILE"
-        echo "▶ $1" | tee -a "$LOG_FILE"
-    }
-fi
-
-# Display success message at end of installation step
-if ! command -v msg_ok &> /dev/null; then
-    msg_ok() {
-        echo "✓ $1" | tee -a "$LOG_FILE"
-    }
-fi
-
-# ============================================================================
-# STEP WRAPPER FUNCTIONS
-# ============================================================================
-# Wrapper functions that auto-increment step counter and format messages
-
-# Start a new installation step
-step_start() {
-    STEP=$((STEP + 1))
-    msg_info "[$STEP] $1"
-}
-
-# Complete an installation step
-step_done() {
-    msg_ok "[$STEP] ${1:-Completed}"
-}
 
 # Configuration is now embedded inline (no external files needed)
 
