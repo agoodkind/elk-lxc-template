@@ -94,17 +94,35 @@ pct exec CONTAINER_ID -- systemctl restart logstash
 
 ### Build System
 
+**Remote Mode** (for PR submission):
 ```bash
-# Remote mode (for PR submission)
 make installer
+```
+Generates CT wrapper that downloads installer from GitHub.
 
-# Local mode (for testing)
+**Local Mode** (for testing/offline use):
+```bash
+# Build fully embedded CT wrapper
 make installer-local
 
-# Template mode
-make template
+# Copy to Proxmox host
+scp out/ct/elk-stack.sh root@PROXMOX_HOST:/root/
 
-# Tests
+# Run on Proxmox console from the webUI (not on SSH)
+/root/elk-stack.sh
+```
+Embeds installer directly in CT wrapper.
+No GitHub download required.
+Follow interactive prompts.
+
+**Template Mode** (for multiple deployments):
+```bash
+make template
+```
+Builds reusable LXC template.
+
+**Tests**:
+```bash
 make test-quick
 ```
 
