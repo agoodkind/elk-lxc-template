@@ -81,7 +81,6 @@ lxc-attach -n "$CTID" -- bash -c "
   export ENABLE_TUN='$ENABLE_TUN'
   export PCT_OSTYPE='$PCT_OSTYPE'
   export PCT_OSVERSION='$PCT_OSVERSION'
-  export NON_INTERACTIVE='true'
   /tmp/install-elk.sh
 "
 EOF

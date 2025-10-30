@@ -162,9 +162,7 @@ if [ -z "$STD" ]; then
         echo "VERBOSE MODE ENABLED"
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
         echo "Environment Variables:"
-        echo "  NON_INTERACTIVE: ${NON_INTERACTIVE:-<not set>}"
         echo "  VERBOSE: ${VERBOSE:-<not set>}"
-        echo "  var_verbose: ${var_verbose:-<not set>}"
         echo "  DEBUG: ${DEBUG:-<not set>}"
         echo "  APPLICATION: ${APPLICATION:-<not set>}"
         echo "  APP: ${APP:-<not set>}"
@@ -183,27 +181,6 @@ if [ -z "$STD" ]; then
     else
         STD="silent"  # Quiet mode: use silent function
     fi
-fi
-
-# Check if running interactively for memory customization
-if [ "${NON_INTERACTIVE:-false}" = "true" ]; then
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo "NON-INTERACTIVE MODE (with verbose logging)"
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo "Using default configuration:"
-    echo "  → Security: Enabled (Elasticsearch auto-configured)"
-    echo "  → SSL: Enabled (auto-generated certificates)"
-    echo "  → Elasticsearch Heap: 8GB"
-    echo "  → Logstash Heap: 4GB"
-    echo "  → Verbose logging: Enabled"
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo ""
-    CUSTOMIZE_MEMORY=no
-fi
-
-if [ -z "$CUSTOMIZE_MEMORY" ] && [ "${NON_INTERACTIVE:-false}" != "true" ]; then
-    echo
-    read -rp "${TAB3}Customize JVM heap sizes? (default: Elasticsearch 4GB, Logstash 2GB) [y/N]: " CUSTOMIZE_MEMORY </dev/tty
 fi
 
 if [[ ${CUSTOMIZE_MEMORY,,} =~ ^(y|yes)$ ]]; then
@@ -341,12 +318,7 @@ cat > /etc/logstash/jvm.options.d/heap.options << EOF
 -Xmx${LS_HEAP_GB:-1}g
 EOF
 
-# Note: Pipelines are configured for HTTPS with API key authentication
-# Users can add custom pipelines to /etc/logstash/conf.d/ after installation
 step_done "Deployed Logstash Configuration"
-
-# Kibana configuration is deferred until after Elasticsearch starts
-# (consolidated with enrollment token and SSL setup below)
 
 # ----------------------------------------------------------------------------
 # Generate Keystore Passwords
