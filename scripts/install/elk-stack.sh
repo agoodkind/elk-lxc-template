@@ -880,7 +880,6 @@ fi
 # ============================================================================
 # INSTALLATION COMPLETE
 # ============================================================================
-log_ok "Completed Successfully!"
 
 log_debug "tail -n 100 /var/log/elasticsearch/elasticsearch.log"
 log_debug "$(tail -n 100 /var/log/elasticsearch/elasticsearch.log)"

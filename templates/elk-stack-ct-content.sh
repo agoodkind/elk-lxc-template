@@ -42,11 +42,7 @@ function update_script() {
 
 start
 build_container
-description
-
-# Execute install script
 {{INSTALL_SCRIPT_OVERRIDE}}
-
 msg_ok "Completed Successfully!\n"
 echo -e "${CREATING}${GN}${APP} setup has been successfully initialized!${CL}"
 echo -e ""
@@ -56,7 +52,7 @@ if [ -z "${IP:-}" ]; then
   IP=$(pct exec "$CTID" ip a s dev eth0 | awk '/inet / {print $2}' | cut -d/ -f1)
 fi
 
-tab () {
+tab() {
   local tabs="$1"
   local result=""
   for ((i=0; i<tabs; i++)); do
