@@ -2,17 +2,17 @@
 {{BUILD_FUNC_SOURCE}}
 # Copyright (c) 2025 Alex Goodkind
 # Author: Alex Goodkind (agoodkind)
-# License: Apache-2.0
+# License: MIT | https://github.com/community-scripts/ProxmoxVE/raw/main/LICENSE
 # Source: https://www.elastic.co/elk-stack
 
 APP="ELK-Stack"
-var_tags="${var_tags:-logging;elasticsearch;kibana;logstash;elk}"
-var_cpu="${var_cpu:-4}"
-var_ram="${var_ram:-8192}"
-var_disk="${var_disk:-100}"
-var_os="${var_os:-ubuntu}"
-var_version="${var_version:-24.04}"
-var_unprivileged="${var_unprivileged:-1}"
+var_tags="logging;elasticsearch;kibana;logstash;elk"
+var_cpu="4"
+var_ram="8192"
+var_disk="100"
+var_os="ubuntu"
+var_version="24.04"
+var_unprivileged="1"
 
 header_info "$APP"
 variables

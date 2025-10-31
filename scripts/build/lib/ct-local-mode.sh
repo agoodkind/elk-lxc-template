@@ -49,8 +49,8 @@ build_local_mode() {
         echo "HOST_SCRIPT=\"/tmp/elk-install-\$\$.sh\""
         echo "cat > \"\$HOST_SCRIPT\" << 'INSTALL_SCRIPT_EOF'"
         
-        # Embed the pre-built installer (strip shebang)
-        grep -v "^#!/usr/bin/env bash" "$INSTALLER_FILE"
+        # Embed the pre-built installer
+        cat "$INSTALLER_FILE"
         
         echo "INSTALL_SCRIPT_EOF"
         echo

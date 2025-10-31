@@ -23,18 +23,24 @@ LOCAL_MODE="${LOCAL_MODE:-false}"
 if [ "$LOCAL_MODE" = "true" ]; then
     echo "Generating $OUT_FILE (embedded mode)..."
     
-    # Embed entire elk-stack.sh
+    # Embed entire elk-stack.sh with ProxmoxVE function initialization
     {
         echo "#!/usr/bin/env bash"
-        echo ""
+        echo
         echo "# Copyright (c) 2025 Alex Goodkind"
         echo "# Author: Alex Goodkind (agoodkind)"
         echo "# License: Apache-2.0"
         echo "# Source: https://www.elastic.co/elk-stack"
-        echo ""
+        echo
         echo "# Embedded elk-stack.sh for local testing"
-        echo "# NON_INTERACTIVE is set by lxc-attach environment (see ct-wrapper.sh)"
-        echo ""
+        echo "source /dev/stdin <<<\"\$FUNCTIONS_FILE_PATH\""
+        echo "color"
+        echo "verb_ip6"
+        echo "catch_errors"
+        echo "setting_up_container"
+        echo "network_check"
+        echo "update_os"
+        echo
         cat scripts/install/elk-stack.sh | grep -v "^#!/usr/bin/env bash"
     } > "$OUT_FILE"
     
@@ -63,7 +69,7 @@ update_os
 
 # Download and execute main installation script
 EOF
-    echo "bash <(curl -fsSL $INSTALL_URL)" >> "$OUT_FILE"
+    cat scripts/install/elk-stack.sh >> "$OUT_FILE"
 
 fi
 
