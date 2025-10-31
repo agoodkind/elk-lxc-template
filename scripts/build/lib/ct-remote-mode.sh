@@ -19,7 +19,32 @@ build_remote_mode() {
     # Generate URLs for runtime downloads
     local build_func_source="source <(curl -fsSL $PROXMOX_REPO_URL/misc/build.func)"
     local install_url="$REPO_URL/$REPO_BRANCH/scripts/install/elk-stack.sh"
-    local install_command="lxc-attach -n \"\$CTID\" -- bash -c \"\$(curl -fsSL $install_url)\""
+    
+    # Build install command with environment variable exports
+    local install_command="lxc-attach -n \"\$CTID\" -- bash -c \"
+  export VERBOSE='\$VERBOSE'
+  export STD='\$STD'
+  export DEBUG='\$DEBUG'
+  export DIAGNOSTICS='yes'
+  export RANDOM_UUID='\$RANDOM_UUID'
+  export CACHER='\$CACHER'
+  export CACHER_IP='\$CACHER_IP'
+  export tz='\$tz'
+  export APPLICATION='\$APPLICATION'
+  export APP='\$APP'
+  export NSAPP='\$NSAPP'
+  export PASSWORD='\$PASSWORD'
+  export SSH_ROOT='\$SSH_ROOT'
+  export SSH_AUTHORIZED_KEY='\$SSH_AUTHORIZED_KEY'
+  export CTID='\$CTID'
+  export CTTYPE='\$CTTYPE'
+  export ENABLE_FUSE='\$ENABLE_FUSE'
+  export ENABLE_TUN='\$ENABLE_TUN'
+  export PCT_OSTYPE='\$PCT_OSTYPE'
+  export PCT_OSVERSION='\$PCT_OSVERSION'
+  export IP='\$IP'
+  \\\$(curl -fsSL $install_url)
+\""
     
     # Replace placeholders in template with URLs
     sed -e "s|{{BUILD_FUNC_SOURCE}}|${build_func_source}|g" \

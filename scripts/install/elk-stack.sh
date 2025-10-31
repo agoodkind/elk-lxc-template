@@ -33,19 +33,16 @@ STEP=0
 # Define TAB3 if not already set (for standalone mode)
 TAB3="${TAB3:-   }"
 
-# Define silent function if not already defined (from Proxmox framework)
-if ! command -v silent &> /dev/null; then
-    silent() {
-        "$@" >/dev/null 2>&1
-    }
-fi
+# Silent execution function
+silent() {
+    "$@" >/dev/null 2>&1
+}
 
 # ============================================================================
 # LOGGING SETUP
 # ============================================================================
 
-# Initialize logging (if not already set by caller)
-# Proxmox framework will define LOG_FILE, standalone mode uses default
+# Initialize logging
 LOG_FILE="${LOG_FILE:-/tmp/elk-install.log}"
 if [ ! -f "$LOG_FILE" ]; then
     echo "$(date '+%Y-%m-%d %H:%M:%S') - \
@@ -53,52 +50,33 @@ Starting ELK Stack installation" | tee "$LOG_FILE"
 fi
 
 # ============================================================================
-# SHIM FUNCTIONS
+# LOGGING FUNCTIONS
 # ============================================================================
-# These functions provide a consistent interface for both execution modes.
-# Proxmox framework defines these in install-header.sh with colored output.
-# Standalone mode defines simple versions here with logging.
+
+# Color codes
+YW="\033[33m"
+YWB="\033[93m"
+GN="\033[1;92m"
+RD="\033[01;31m"
+CL="\033[m"
 
 # Display informational message at start of installation step
-if ! command -v msg_info &> /dev/null; then
-    msg_info() {
-        echo "" | tee -a "$LOG_FILE"
-        echo "▶ $1" | tee -a "$LOG_FILE"
-    }
-fi
+log_info() {
+    echo -e "${YW}▶ $1${CL}" | tee -a "$LOG_FILE"
+}
 
 # Display success message at end of installation step
-if ! command -v msg_ok &> /dev/null; then
-    msg_ok() {
-        echo "✓ $1" | tee -a "$LOG_FILE"
-    }
-fi
+log_ok() {
+    echo -e "${GN}✓ $1${CL}" | tee -a "$LOG_FILE"
+}
 
 # Display warning message
-if ! command -v msg_warn &> /dev/null; then
-    msg_warn() {
-        echo "⚠ $1" | tee -a "$LOG_FILE"
-    }
-fi
-
-# ============================================================================
-# STEP WRAPPER FUNCTIONS
-# ============================================================================
-# Wrapper functions that auto-increment step counter and format messages
-
-# Start a new installation step
-step_start() {
-    STEP=$((STEP + 1))
-    msg_info "[$STEP] $1"
+log_warn() {
+    echo -e "${YWB}⚠ $1${CL}" | tee -a "$LOG_FILE"
 }
 
-# Complete an installation step
-step_done() {
-    msg_ok "[$STEP] ${1:-Completed}"
-}
-
-# Define verbose logging function
-msg_verbose() {
+# Verbose logging function
+log_verbose() {
     if [ "${VERBOSE}" = "yes" ] || [ "${var_verbose}" = "yes" ]; then
         if [ -n "${LOG_FILE:-}" ]; then
             echo "$@" | tee -a "$LOG_FILE"
@@ -108,8 +86,8 @@ msg_verbose() {
     fi
 }
 
-# Define debug function to show file contents
-msg_debug() {
+# Debug function to show file contents
+log_debug() {
     if [ "${DEBUG}" = "yes" ] ; then
         local msg="$1"
         local file="$2"
@@ -137,13 +115,13 @@ msg_debug() {
     fi
 }
 
-# Define error logging function
-msg_error() {
-    local error_msg="✗ ERROR: $*"
+# Error logging function
+log_error() {
+    local error_msg="${RD}✗ ERROR: $*${CL}"
     if [ -n "${LOG_FILE:-}" ]; then
-        echo "$error_msg" | tee -a "$LOG_FILE"
+        echo -e "$error_msg" | tee -a "$LOG_FILE"
     else
-        echo "$error_msg"
+        echo -e "$error_msg"
     fi
     
     # In verbose mode, show last ~100 lines of Elasticsearch log if available
@@ -162,6 +140,24 @@ msg_error() {
             } | if [ -n "${LOG_FILE:-}" ]; then tee -a "$LOG_FILE"; else cat; fi
         fi
     fi
+}
+
+
+# ============================================================================
+# STEP WRAPPER FUNCTIONS
+# ============================================================================
+# Wrapper functions that auto-increment step counter and format messages
+
+# Start a new installation step
+step_start() {
+    echo
+    STEP=$((STEP + 1))
+    log_info "[$STEP] $1"
+}
+
+# Complete an installation step
+step_done() {
+    log_ok "[$STEP] ${1:-Completed}"
 }
 
 # Set STD if not already defined (Proxmox framework sets this)
@@ -184,11 +180,11 @@ if [ -z "$STD" ]; then
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
         echo ""
 
-        msg_debug "Debug Message Test" 
-        msg_error "Error Message Test"
-        msg_verbose "Verbose Message Test"
-        msg_info "Info Message Test"
-        msg_ok "OK Message Test"
+        log_debug "Debug Message Test" 
+        log_error "Error Message Test"
+        log_verbose "Verbose Message Test"
+        log_info "Info Message Test"
+        log_ok "OK Message Test"
     else
         STD="silent"  # Quiet mode: use silent function
     fi
@@ -210,11 +206,11 @@ else
   LS_HEAP_GB=2
 fi
 
-msg_verbose "Final configuration:"
-msg_verbose "  → Security + SSL: Always enabled (Elasticsearch auto-config)"
-msg_verbose "  → Elasticsearch Heap: ${ES_HEAP_GB}GB"
-msg_verbose "  → Logstash Heap: ${LS_HEAP_GB}GB"
-msg_verbose ""
+log_verbose "Final configuration:"
+log_verbose "  → Security + SSL: Always enabled (Elasticsearch auto-config)"
+log_verbose "  → Elasticsearch Heap: ${ES_HEAP_GB}GB"
+log_verbose "  → Logstash Heap: ${LS_HEAP_GB}GB"
+log_verbose ""
 
 echo
 
@@ -227,7 +223,7 @@ echo
 # ----------------------------------------------------------------------------
 step_start "Update repositories"
 if ! DEBIAN_FRONTEND=noninteractive apt-get update -qq; then
-    msg_error "Failed to update repositories"
+    log_error "Failed to update repositories"
     exit 1
 fi
 step_done "Updated repositories"
@@ -244,7 +240,7 @@ if ! DEBIAN_FRONTEND=noninteractive apt-get install -qq -y \
     wget gnupg apt-transport-https ca-certificates \
     openjdk-11-jre-headless curl unzip openssl \
     htop net-tools vim jq; then
-    msg_error "Failed to install dependencies"
+    log_error "Failed to install dependencies"
     exit 1
 fi
 step_done "Installed Dependencies"
@@ -270,7 +266,7 @@ step_done "Added Elastic Repository"
 step_start "Updating Package Lists"
 # Update package list to include Elastic repository
 if ! DEBIAN_FRONTEND=noninteractive apt-get update -qq; then
-    msg_error "Failed to update package lists"
+    log_error "Failed to update package lists"
     exit 1
 fi
 step_done "Updated Package Lists"
@@ -279,16 +275,16 @@ step_done "Updated Package Lists"
 # Install ELK Stack Packages
 # ----------------------------------------------------------------------------
 step_start "Installing ELK Stack (Elasticsearch, Logstash, Kibana)"
-msg_info "  → Downloading packages (~3GB, may take 5-15 minutes)..."
+log_info "  → Downloading packages (~3GB, may take 5-15 minutes)..."
 # Install all three ELK components
-if [ "${DEBUG}" = "yes" ]; then
+if [ "${VERBOSE}" = "yes" ]; then
     if ! DEBIAN_FRONTEND=noninteractive apt-get install -y elasticsearch logstash kibana ; then
-        msg_error "Failed to install ELK Stack packages"
+        log_error "Failed to install ELK Stack packages"
         exit 1
     fi
 else
     if ! DEBIAN_FRONTEND=noninteractive apt-get install -qq -y elasticsearch logstash kibana > /dev/null 2>&1 ; then
-        msg_error "Failed to install ELK Stack packages"
+        log_error "Failed to install ELK Stack packages"
         exit 1
     fi
 fi
@@ -307,7 +303,7 @@ step_done "Prepared Elasticsearch Directories"
 # We don't touch elasticsearch.yml before startup - let auto-config handle everything
 # Network settings will be configured after auto-config completes
 step_start "Configuring Elasticsearch JVM Heap"
-msg_debug "Existing jvm.options.d/heap.options" /etc/elasticsearch/jvm.options.d/heap.options
+log_debug "Existing jvm.options.d/heap.options" /etc/elasticsearch/jvm.options.d/heap.options
 cat > /etc/elasticsearch/jvm.options.d/heap.options << EOF
 # JVM heap settings for Elasticsearch
 -Xms${ES_HEAP_GB:-2}g
@@ -327,8 +323,8 @@ step_done "Prepared Logstash Directories"
 # Deploy Logstash Configuration
 # ----------------------------------------------------------------------------
 step_start "Configuring Logstash JVM Heap"
-msg_verbose "  → Configuring Logstash JVM heap size..."
-msg_debug "Existing jvm.options.d/heap.options" /etc/logstash/jvm.options.d/heap.options
+log_verbose "  → Configuring Logstash JVM heap size..."
+log_debug "Existing jvm.options.d/heap.options" /etc/logstash/jvm.options.d/heap.options
 # Configure heap size
 cat > /etc/logstash/jvm.options.d/heap.options << EOF
 # JVM heap settings for Logstash
@@ -342,7 +338,7 @@ step_done "Deployed Logstash Configuration"
 # Generate Keystore Passwords
 # ----------------------------------------------------------------------------
 step_start "Generating Keystore Passwords"
-msg_verbose "  → Generating secure password for Logstash keystore..."
+log_verbose "  → Generating secure password for Logstash keystore..."
 # Generate secure random password for Logstash keystore (required v8+)
 LOGSTASH_KEYSTORE_PASS=$(openssl rand -base64 32)
 
@@ -353,19 +349,19 @@ chown root:root /etc/default/logstash
 chmod 0600 /etc/default/logstash
 
 # Add to root's environment for interactive sessions
-msg_verbose "  → Adding Logstash keystore password to /root/.bashrc..."
+log_verbose "  → Adding Logstash keystore password to /root/.bashrc..."
 if ! grep -q "LOGSTASH_KEYSTORE_PASS" /root/.bashrc; then
     echo "" >> /root/.bashrc
     echo "# Logstash keystore password" >> /root/.bashrc
     echo "export LOGSTASH_KEYSTORE_PASS=\"\
 ${LOGSTASH_KEYSTORE_PASS}\"" >> /root/.bashrc
-    msg_verbose "  ✓ Added to .bashrc"
+    log_verbose "  ✓ Added to .bashrc"
 fi
 
 # Export for current session
 export LOGSTASH_KEYSTORE_PASS
-msg_verbose "  ✓ Password exported to current session"
-msg_verbose "  ✓ Password length: ${#LOGSTASH_KEYSTORE_PASS} characters"
+log_verbose "  ✓ Password exported to current session"
+log_verbose "  ✓ Password length: ${#LOGSTASH_KEYSTORE_PASS} characters"
 
 step_done "Generated Keystore Passwords"
 
@@ -377,10 +373,10 @@ step_done "Generated Keystore Passwords"
 #   - Kibana: enrollment token (kibana-setup) creates it
 #   - Logstash: must be created manually (no auto-config)
 step_start "Initializing Logstash Keystore"
-msg_verbose "  → Removing any existing Logstash keystore..."
+log_verbose "  → Removing any existing Logstash keystore..."
 rm -f /etc/logstash/logstash.keystore
-msg_verbose "  → Creating new Logstash keystore with password..."
-msg_verbose "  → Using path: /etc/logstash"
+log_verbose "  → Creating new Logstash keystore with password..."
+log_verbose "  → Using path: /etc/logstash"
 if [ "$VERBOSE" = "yes" ]; then
     /usr/share/logstash/bin/logstash-keystore \
         --path.settings /etc/logstash create
@@ -388,11 +384,11 @@ else
     /usr/share/logstash/bin/logstash-keystore \
         --path.settings /etc/logstash create >/dev/null 2>&1
 fi
-msg_verbose "  → Setting ownership to logstash:root"
+log_verbose "  → Setting ownership to logstash:root"
 chown logstash:root /etc/logstash/logstash.keystore
-msg_verbose "  → Setting permissions to 0600"
+log_verbose "  → Setting permissions to 0600"
 chmod 0600 /etc/logstash/logstash.keystore
-msg_verbose "  ✓ Keystore created at /etc/logstash/logstash.keystore"
+log_verbose "  ✓ Keystore created at /etc/logstash/logstash.keystore"
 if [ "$VERBOSE" = "yes" ]; then
     ls -lh /etc/logstash/logstash.keystore
 fi
@@ -412,13 +408,13 @@ step_done "Initialized Logstash Keystore"
 # Start Elasticsearch (needed for user/key creation)
 # ----------------------------------------------------------------------------
 step_start "Starting Elasticsearch"
-msg_verbose "  → Enabling Elasticsearch service..."
+log_verbose "  → Enabling Elasticsearch service..."
 $STD systemctl enable elasticsearch
-msg_verbose "  → Starting Elasticsearch service..."
+log_verbose "  → Starting Elasticsearch service..."
 $STD systemctl start elasticsearch
-msg_verbose "  → Waiting 30 seconds for Elasticsearch to initialize..."
+log_verbose "  → Waiting 30 seconds for Elasticsearch to initialize..."
 sleep 30
-msg_verbose "  → Checking Elasticsearch status..."
+log_verbose "  → Checking Elasticsearch status..."
 if [ "$VERBOSE" = "yes" ]; then
     systemctl status elasticsearch --no-pager || true
 fi
@@ -430,15 +426,15 @@ step_done "Started Elasticsearch"
 # Note: Kibana will be auto-configured via enrollment token
 # Logstash needs the CA cert for connecting to Elasticsearch
 step_start "Preparing Logstash SSL"
-msg_verbose "  → Waiting for Elasticsearch auto-generated certificates..."
+log_verbose "  → Waiting for Elasticsearch auto-generated certificates..."
 
 # Wait for ES to generate certificates (auto-config happens on first startup)
 MAX_WAIT=60
 WAIT_COUNT=0
 while [ $WAIT_COUNT -lt $MAX_WAIT ]; do
-    msg_verbose "  → Checking for Elasticsearch auto-generated certificates... ($WAIT_COUNT/$MAX_WAIT)"
+    log_verbose "  → Checking for Elasticsearch auto-generated certificates... ($WAIT_COUNT/$MAX_WAIT)"
     if [ -f /etc/elasticsearch/certs/http_ca.crt ]; then
-        msg_verbose "  ✓ Certificates found"
+        log_verbose "  ✓ Certificates found"
         break
     fi
     sleep 2
@@ -446,25 +442,25 @@ while [ $WAIT_COUNT -lt $MAX_WAIT ]; do
 done
 
 if [ ! -f /etc/elasticsearch/certs/http_ca.crt ]; then
-    msg_error "Auto-generated certificates not found after waiting"
+    log_error "Auto-generated certificates not found after waiting"
     exit 1
 fi
 
 # Copy http_ca.crt for Logstash (Kibana handled by enrollment token)
-msg_verbose "  → Copying http_ca.crt for Logstash..."
+log_verbose "  → Copying http_ca.crt for Logstash..."
 mkdir -p /etc/logstash/certs
 cp /etc/elasticsearch/certs/http_ca.crt /etc/logstash/certs/ca.crt
 chmod 640 /etc/logstash/certs/ca.crt
 chown logstash:logstash /etc/logstash/certs/ca.crt
-msg_verbose "  ✓ Logstash SSL prepared"
+log_verbose "  ✓ Logstash SSL prepared"
 step_done "Prepared Logstash SSL"
 
 # ----------------------------------------------------------------------------
 # Configure Elasticsearch Network Settings (after auto-config)
 # ----------------------------------------------------------------------------
 step_start "Configuring Elasticsearch Network Settings"
-msg_verbose "  → Adding network configuration to elasticsearch.yml..."
-msg_debug "Existing elasticsearch.yml" /etc/elasticsearch/elasticsearch.yml
+log_verbose "  → Adding network configuration to elasticsearch.yml..."
+log_debug "Existing elasticsearch.yml" /etc/elasticsearch/elasticsearch.yml
 # Comment out any existing network.host and cluster.name (from auto-config or defaults)
 sed -i 's/^network.host:/#&/' /etc/elasticsearch/elasticsearch.yml
 sed -i 's/^cluster.name:/#&/' /etc/elasticsearch/elasticsearch.yml
@@ -481,15 +477,15 @@ network.host: ["_local_", "_site_"]
 cluster.name: ${CLUSTER_NAME}
 EOF
 
-msg_verbose "  → Restarting Elasticsearch to apply network changes..."
+log_verbose "  → Restarting Elasticsearch to apply network changes..."
 $STD systemctl restart elasticsearch
-msg_verbose "  → Waiting for Elasticsearch to be ready..."
+log_verbose "  → Waiting for Elasticsearch to be ready..."
 # Wait for Elasticsearch to be ready (can take 15-30 seconds after restart)
 MAX_WAIT=60
 WAIT_COUNT=0
 while [ $WAIT_COUNT -lt $MAX_WAIT ]; do
     if curl -k -s -o /dev/null -w "%{http_code}" https://localhost:9200 | grep -qE "(200|401|403)"; then
-        msg_verbose "  ✓ Elasticsearch is ready"
+        log_verbose "  ✓ Elasticsearch is ready"
         break
     fi
     sleep 2
@@ -497,10 +493,10 @@ while [ $WAIT_COUNT -lt $MAX_WAIT ]; do
 done
 
 if [ $WAIT_COUNT -ge $MAX_WAIT ]; then
-    msg_error "Elasticsearch did not become ready after restart"
+    log_error "Elasticsearch did not become ready after restart"
     exit 1
 fi
-msg_verbose "  ✓ Elasticsearch restarted with new network settings"
+log_verbose "  ✓ Elasticsearch restarted with new network settings"
 step_done "Configured Elasticsearch Network Settings"
 
 # ----------------------------------------------------------------------------
@@ -513,38 +509,38 @@ CURL_OPTS="-k"
 # Generate Elastic Password (always needed - security is always enabled)
 # ----------------------------------------------------------------------------
 step_start "Generating Elastic Password"
-msg_verbose "  → Auto-generating password for elastic user..."
+log_verbose "  → Auto-generating password for elastic user..."
 
 # Use auto-generate mode (-a) with batch mode (-b) to avoid password echo
 RESET_OUTPUT=$(/usr/share/elasticsearch/bin/elasticsearch-reset-password -u elastic -a -b 2>&1)
 
 if [ $? -ne 0 ]; then
-    msg_error "Failed to reset elastic user password"
-    msg_verbose "  → Output: $RESET_OUTPUT"
+    log_error "Failed to reset elastic user password"
+    log_verbose "  → Output: $RESET_OUTPUT"
     exit 1
 fi
 
 # Extract password from output (case-insensitive for "new value")
 ELASTIC_PASSWORD=$(echo "$RESET_OUTPUT" | grep -i "new value" | awk '{print $NF}')
-msg_debug "Extracted password: $ELASTIC_PASSWORD"
+log_debug "Extracted password: $ELASTIC_PASSWORD"
 if [ -z "$ELASTIC_PASSWORD" ]; then
-    msg_error "Failed to extract password from reset output"
+    log_error "Failed to extract password from reset output"
     exit 1
 fi
-msg_verbose "  ✓ Password generated (length: ${#ELASTIC_PASSWORD} chars)"
+log_verbose "  ✓ Password generated (length: ${#ELASTIC_PASSWORD} chars)"
 
 # Verify authentication works
-msg_verbose "  → Verifying password authentication..."
+log_verbose "  → Verifying password authentication..."
 MAX_AUTH_WAIT=30
 AUTH_WAIT=0
 while [ $AUTH_WAIT -lt $MAX_AUTH_WAIT ]; do
     
     AUTH_TEST=$(curl $CURL_OPTS -s -u "elastic:$ELASTIC_PASSWORD" \
         -X GET "$ES_URL/_security/_authenticate" 2>&1)
-    msg_debug "Auth test response: $AUTH_TEST"
+    log_debug "Auth test response: $AUTH_TEST"
 
     if echo "$AUTH_TEST" | grep -q '"username":"elastic"'; then
-        msg_verbose "  ✓ Password verified successfully"
+        log_verbose "  ✓ Password verified successfully"
         break
     fi
     sleep 2
@@ -552,22 +548,22 @@ while [ $AUTH_WAIT -lt $MAX_AUTH_WAIT ]; do
 done
 
 if [ $AUTH_WAIT -ge $MAX_AUTH_WAIT ]; then
-    msg_error "Password reset completed but authentication verification failed"
-    msg_verbose "  → Auth test response: $AUTH_TEST"
+    log_error "Password reset completed but authentication verification failed"
+    log_verbose "  → Auth test response: $AUTH_TEST"
     exit 1
 fi
 
-msg_verbose "  ✓ Authentication verified"
+log_verbose "  ✓ Authentication verified"
 step_done "Generated Elastic Password"
 
 # ----------------------------------------------------------------------------
 # Configure Kibana (consolidated: basic config + enrollment)
 # ----------------------------------------------------------------------------
 step_start "Configuring Kibana"
-msg_debug "Existing kibana.yml" /etc/kibana/kibana.yml
+log_debug "Existing kibana.yml" /etc/kibana/kibana.yml
 
 # Configure basic server settings
-msg_verbose "  → Configuring Kibana server settings..."
+log_verbose "  → Configuring Kibana server settings..."
 sed -i 's/^server.port:/#&/' /etc/kibana/kibana.yml
 sed -i 's/^server.host:/#&/' /etc/kibana/kibana.yml
 sed -i 's/^elasticsearch.hosts:/#&/' /etc/kibana/kibana.yml
@@ -587,36 +583,36 @@ server.host: "::"
 EOF
 
 # Generate and apply enrollment token
-msg_verbose "  → Creating enrollment token for Kibana..."
+log_verbose "  → Creating enrollment token for Kibana..."
 ENROLLMENT_TOKEN=$(/usr/share/elasticsearch/bin/elasticsearch-create-enrollment-token -s kibana)
-msg_debug "Enrollment token: $ENROLLMENT_TOKEN"
+log_debug "Enrollment token: $ENROLLMENT_TOKEN"
 
 if [ -z "$ENROLLMENT_TOKEN" ]; then
-    msg_error "Failed to generate Kibana enrollment token"
-    msg_verbose "  → Check if xpack.security.enrollment.enabled is true"
-    msg_verbose "  → Check Elasticsearch logs for auto-configuration errors"
+    log_error "Failed to generate Kibana enrollment token"
+    log_verbose "  → Check if xpack.security.enrollment.enabled is true"
+    log_verbose "  → Check Elasticsearch logs for auto-configuration errors"
     exit 1
 fi
-msg_verbose "  ✓ Enrollment token created (length: ${#ENROLLMENT_TOKEN} chars)"
+log_verbose "  ✓ Enrollment token created (length: ${#ENROLLMENT_TOKEN} chars)"
 
-msg_verbose "  → Applying enrollment token (configures backend connection to Elasticsearch)..."
+log_verbose "  → Applying enrollment token (configures backend connection to Elasticsearch)..."
 if ! /usr/share/kibana/bin/kibana-setup --enrollment-token "$ENROLLMENT_TOKEN"; then
-    msg_error "Failed to apply enrollment token to Kibana"
+    log_error "Failed to apply enrollment token to Kibana"
     exit 1
 fi
 
 # Update Elasticsearch connection to use localhost instead of IP
-msg_verbose "  → Updating elasticsearch.hosts to use localhost..."
+log_verbose "  → Updating elasticsearch.hosts to use localhost..."
 sed -i 's|elasticsearch.hosts:.*|elasticsearch.hosts: [https://localhost:9200]|' /etc/kibana/kibana.yml
 
-msg_verbose "  ✓ Kibana backend configured (HTTPS to Elasticsearch via localhost)"
+log_verbose "  ✓ Kibana backend configured (HTTPS to Elasticsearch via localhost)"
 step_done "Configured Kibana"
 
 # ----------------------------------------------------------------------------
 # Create Logstash API Key
 # ----------------------------------------------------------------------------
 step_start "Creating Logstash API Key"
-msg_verbose "  → Defining Logstash writer role permissions for all indices"
+log_verbose "  → Defining Logstash writer role permissions for all indices"
 LOGSTASH_ROLE=$(cat <<'EOF'
 {
   "name": "logstash_writer",
@@ -635,8 +631,8 @@ LOGSTASH_ROLE=$(cat <<'EOF'
 }
 EOF
 )
-msg_verbose "  → Creating API key via Elasticsearch API..."
-msg_verbose "  → Endpoint: $ES_URL/_security/api_key"
+log_verbose "  → Creating API key via Elasticsearch API..."
+log_verbose "  → Endpoint: $ES_URL/_security/api_key"
 
 LOGSTASH_KEY_RESPONSE=$(curl $CURL_OPTS -s -X POST \
     "$ES_URL/_security/api_key" \
@@ -644,7 +640,7 @@ LOGSTASH_KEY_RESPONSE=$(curl $CURL_OPTS -s -X POST \
     -H "Content-Type: application/json" \
     -d "$LOGSTASH_ROLE")
 
-msg_debug "Logstash key response: $LOGSTASH_KEY_RESPONSE"
+log_debug "Logstash key response: $LOGSTASH_KEY_RESPONSE"
 
 # Extract ID and API key from JSON response
 LOGSTASH_ID=$(echo "$LOGSTASH_KEY_RESPONSE" | jq -r '.id')
@@ -654,13 +650,13 @@ LOGSTASH_KEY=$(echo "$LOGSTASH_KEY_RESPONSE" | jq -r '.api_key')
 LOGSTASH_API_KEY="${LOGSTASH_ID}:${LOGSTASH_KEY}"
 
 if [ -z "$LOGSTASH_API_KEY" ]; then
-    msg_error "Failed to extract API key from Elasticsearch response"
-    msg_verbose "  → Response: $LOGSTASH_KEY_RESPONSE"
+    log_error "Failed to extract API key from Elasticsearch response"
+    log_verbose "  → Response: $LOGSTASH_KEY_RESPONSE"
     exit 1
 fi
-msg_verbose "  ✓ Logstash API key created (length: ${#LOGSTASH_API_KEY} chars)"
+log_verbose "  ✓ Logstash API key created (length: ${#LOGSTASH_API_KEY} chars)"
 if [ "$VERBOSE" = "yes" ]; then
-    msg_verbose "  ✓ API key successfully extracted from response"
+    log_verbose "  ✓ API key successfully extracted from response"
 fi
 step_done "Created Logstash API Key"
 
@@ -668,19 +664,25 @@ step_done "Created Logstash API Key"
 # Configure Logstash Keystore
 # ----------------------------------------------------------------------------
 step_start "Configuring Logstash Keystore"
-msg_verbose "  → Adding Logstash API key to keystore (ELASTICSEARCH_API_KEY)..."
+log_verbose "  → Adding Logstash API key to keystore (ELASTICSEARCH_API_KEY)..."
 
-echo "$LOGSTASH_API_KEY" | /usr/share/logstash/bin/logstash-keystore \
-    --path.settings /etc/logstash \
-    add ELASTICSEARCH_API_KEY --stdin
+if [ "$VERBOSE" = "yes" ]; then
+    echo "$LOGSTASH_API_KEY" | /usr/share/logstash/bin/logstash-keystore \
+        --path.settings /etc/logstash \
+        add ELASTICSEARCH_API_KEY --stdin
+else
+    echo "$LOGSTASH_API_KEY" | /usr/share/logstash/bin/logstash-keystore \
+        --path.settings /etc/logstash \
+        add ELASTICSEARCH_API_KEY --stdin >/dev/null 2>&1
+fi
 
-msg_verbose "  ✓ API key added to keystore"
-msg_verbose "  → Setting keystore ownership and permissions..."
+log_verbose "  ✓ API key added to keystore"
+log_verbose "  → Setting keystore ownership and permissions..."
 chown logstash:root /etc/logstash/logstash.keystore
 chmod 0600 /etc/logstash/logstash.keystore
-msg_verbose "  ✓ Keystore configured with secure permissions"
+log_verbose "  ✓ Keystore configured with secure permissions"
 if [ "$VERBOSE" = "yes" ]; then
-    msg_verbose "  → Listing keystore keys:"
+    log_verbose "  → Listing keystore keys:"
     /usr/share/logstash/bin/logstash-keystore --path.settings /etc/logstash list
 fi
 step_done "Configured Logstash Keystore"
@@ -743,10 +745,10 @@ step_done "Configured Logstash Output"
 step_start "Saving Credentials"
 KIBANA_URL="http://$(hostname -I | awk '{print $1}'):5601"
 
-msg_verbose "  → Writing credentials to /root/elk-credentials.txt..."
-msg_verbose "  → Kibana URL: $KIBANA_URL"
-msg_verbose "  → Username: elastic"
-msg_verbose "  → Password length: ${#ELASTIC_PASSWORD} characters"
+log_verbose "  → Writing credentials to /root/elk-credentials.txt..."
+log_verbose "  → Kibana URL: $KIBANA_URL"
+log_verbose "  → Username: elastic"
+log_verbose "  → Password length: ${#ELASTIC_PASSWORD} characters"
 cat > /root/elk-credentials.txt << EOF
 ELK Stack Credentials
 =====================
@@ -781,11 +783,11 @@ step_done "Saved Credentials"
 # Enable and Start Services
 # ----------------------------------------------------------------------------
 step_start "Starting Services"
-msg_verbose "  → Enabling Logstash and Kibana services..."
+log_verbose "  → Enabling Logstash and Kibana services..."
 $STD systemctl enable logstash kibana
-msg_verbose "  → Starting Logstash and Kibana services..."
+log_verbose "  → Starting Logstash and Kibana services..."
 $STD systemctl start logstash kibana
-msg_verbose "  → Checking service status..."
+log_verbose "  → Checking service status..."
 if [ "$VERBOSE" = "yes" ]; then
     systemctl status logstash --no-pager || true
     systemctl status kibana --no-pager || true
@@ -796,13 +798,13 @@ step_done "Started Services"
 # Create Kibana Data View
 # ----------------------------------------------------------------------------
 step_start "Creating Kibana Data View"
-msg_verbose "  → Waiting for Kibana to be ready..."
+log_verbose "  → Waiting for Kibana to be ready..."
 
 MAX_WAIT=90
 WAITED=0
 while [ $WAITED -lt $MAX_WAIT ]; do
     if curl -s -k -u "elastic:$ELASTIC_PASSWORD" "http://localhost:5601/api/status" | grep -q "available"; then
-        msg_debug "Kibana status available after ${WAITED}s"
+        log_debug "Kibana status available after ${WAITED}s"
         break
     fi
     sleep 2
@@ -810,12 +812,12 @@ while [ $WAITED -lt $MAX_WAIT ]; do
 done
 
 if [ $WAITED -ge $MAX_WAIT ]; then
-    msg_warn "Kibana did not become ready in time, skipping data view creation"
+    log_warn "Kibana did not become ready in time, skipping data view creation"
 else
-    msg_verbose "  → Waiting for Kibana to fully initialize..."
+    log_verbose "  → Waiting for Kibana to fully initialize..."
     sleep 10
     
-    msg_verbose "  → Creating data view for logs-generic-default..."
+    log_verbose "  → Creating data view for logs-generic-default..."
     
     DATAVIEW_CREATED=false
     for attempt in 1 2 3; do
@@ -831,14 +833,14 @@ else
                 }
             }' 2>&1)
         
-        msg_debug "Data view response (attempt $attempt): $DATAVIEW_RESPONSE"
+        log_debug "Data view response (attempt $attempt): $DATAVIEW_RESPONSE"
         
         if echo "$DATAVIEW_RESPONSE" | grep -q "data_view"; then
-            msg_verbose "  ✓ Data view created successfully"
+            log_verbose "  ✓ Data view created successfully"
             DATAVIEW_CREATED=true
             break
         elif echo "$DATAVIEW_RESPONSE" | grep -q "not ready"; then
-            msg_debug "Kibana not ready, waiting 5s before retry..."
+            log_debug "Kibana not ready, waiting 5s before retry..."
             sleep 5
         else
             break
@@ -846,7 +848,7 @@ else
     done
     
     if [ "$DATAVIEW_CREATED" = false ]; then
-        msg_warn "Data view creation failed or already exists"
+        log_warn "Data view creation failed or already exists"
     fi
 fi
 
@@ -856,13 +858,13 @@ step_done "Created Kibana Data View"
 # Test Log Ingestion
 # ----------------------------------------------------------------------------
 step_start "Testing Log Ingestion"
-msg_verbose "  → Waiting for Logstash to be ready..."
+log_verbose "  → Waiting for Logstash to be ready..."
 
 MAX_LOGSTASH_WAIT=30
 LOGSTASH_WAITED=0
 while [ $LOGSTASH_WAITED -lt $MAX_LOGSTASH_WAIT ]; do
     if netstat -tln | grep -q ":8080 "; then
-        msg_debug "Logstash HTTP input ready after ${LOGSTASH_WAITED}s"
+        log_debug "Logstash HTTP input ready after ${LOGSTASH_WAITED}s"
         break
     fi
     sleep 2
@@ -870,10 +872,10 @@ while [ $LOGSTASH_WAITED -lt $MAX_LOGSTASH_WAIT ]; do
 done
 
 if [ $LOGSTASH_WAITED -ge $MAX_LOGSTASH_WAIT ]; then
-    msg_warn "Logstash HTTP input not ready, skipping ingestion test"
+    log_warn "Logstash HTTP input not ready, skipping ingestion test"
     step_done "Skipped Log Ingestion Test"
 else
-    msg_verbose "  → Sending test log to Logstash..."
+    log_verbose "  → Sending test log to Logstash..."
     TEST_MESSAGE="ELK Stack installation test log at $(date '+%Y-%m-%d %H:%M:%S')"
 
     POST_RESPONSE=$(curl -s -X POST "http://localhost:8080" \
@@ -887,12 +889,12 @@ else
 EOF
 )" 2>&1)
 
-    msg_debug "POST response: $POST_RESPONSE"
+    log_debug "POST response: $POST_RESPONSE"
 
-    msg_verbose "  → Waiting for log to be indexed..."
+    log_verbose "  → Waiting for log to be indexed..."
     sleep 10
 
-    msg_verbose "  → Querying Elasticsearch for test log..."
+    log_verbose "  → Querying Elasticsearch for test log..."
     SEARCH_RESPONSE=$(curl -s -k -u "elastic:$ELASTIC_PASSWORD" \
         -X GET "https://localhost:9200/logs-generic-default/_search" \
         -H "Content-Type: application/json" \
@@ -908,13 +910,13 @@ EOF
 EOF
 )" 2>&1)
 
-    msg_debug "Search response: $SEARCH_RESPONSE"
+    log_debug "Search response: $SEARCH_RESPONSE"
 
     if echo "$SEARCH_RESPONSE" | jq -r '.hits.total.value' | grep -qE '^[1-9][0-9]*$'; then
-        msg_verbose "  ✓ Test log successfully ingested and indexed"
+        log_verbose "  ✓ Test log successfully ingested and indexed"
     else
-        msg_warn "Test log not found in Elasticsearch (may need more time to index)"
-        msg_debug "Check Logstash logs: tail -f /var/log/logstash/logstash-plain.log"
+        log_warn "Test log not found in Elasticsearch (may need more time to index)"
+        log_debug "Check Logstash logs: tail -f /var/log/logstash/logstash-plain.log"
     fi
 
     step_done "Tested Log Ingestion"
@@ -923,17 +925,17 @@ fi
 # ============================================================================
 # INSTALLATION COMPLETE
 # ============================================================================
-msg_ok "Completed Successfully!"
+log_ok "Completed Successfully!"
 
-msg_debug "tail -n 100 /var/log/elasticsearch/elasticsearch.log"
-msg_debug "$(tail -n 100 /var/log/elasticsearch/elasticsearch.log)"
-msg_debug "--------------------------------"
-msg_debug "tail -n 100 /var/log/logstash/logstash-plain.log"
-msg_debug "$(tail -n 100 /var/log/logstash/logstash-plain.log)"
-msg_debug "--------------------------------"
-msg_debug "tail -n 100 /var/log/kibana/kibana.log"
-msg_debug "$(tail -n 100 /var/log/kibana/kibana.log)"
-msg_debug "--------------------------------"
+log_debug "tail -n 100 /var/log/elasticsearch/elasticsearch.log"
+log_debug "$(tail -n 100 /var/log/elasticsearch/elasticsearch.log)"
+log_debug "--------------------------------"
+log_debug "tail -n 100 /var/log/logstash/logstash-plain.log"
+log_debug "$(tail -n 100 /var/log/logstash/logstash-plain.log)"
+log_debug "--------------------------------"
+log_debug "tail -n 100 /var/log/kibana/kibana.log"
+log_debug "$(tail -n 100 /var/log/kibana/kibana.log)"
+log_debug "--------------------------------"
 
 # Write final log message
 echo "" | tee -a "$LOG_FILE"
