@@ -53,17 +53,18 @@ build_local_mode() {
         grep -v "^#!/usr/bin/env bash" "$INSTALLER_FILE"
         
         echo "INSTALL_SCRIPT_EOF"
-        echo ""
+        echo
         echo "# Push installer to container and make executable"
         echo 'chmod +x "$HOST_SCRIPT"'
         echo 'pct push "$CTID" "$HOST_SCRIPT" /tmp/install-elk.sh --perms 755'
-        echo ''
+        echo
         echo "# Execute installer in container with all environment variables"
         echo "# NON_INTERACTIVE=true is hardcoded at build time (dev-only, LOCAL_MODE=true)"
         cat <<'EOF'
 lxc-attach -n "$CTID" -- bash -c "
   export VERBOSE='$VERBOSE'
-  export DEBUG='yes'
+  export STD='$STD'
+  export DEBUG='$DEBUG'
   export DIAGNOSTICS='yes'
   export RANDOM_UUID='$RANDOM_UUID'
   export CACHER='$CACHER'
@@ -81,6 +82,7 @@ lxc-attach -n "$CTID" -- bash -c "
   export ENABLE_TUN='$ENABLE_TUN'
   export PCT_OSTYPE='$PCT_OSTYPE'
   export PCT_OSVERSION='$PCT_OSVERSION'
+  export IP='$IP'
   /tmp/install-elk.sh
 "
 EOF
