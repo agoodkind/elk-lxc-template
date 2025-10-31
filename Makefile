@@ -2,7 +2,7 @@
 # Copyright (c) 2025 Alex Goodkind (alex@goodkind.io)
 # License: Apache-2.0
 
-.PHONY: clean test test-quick check-components help installer-local
+.PHONY: clean test test-quick check-components help installer-local deploy
 
 # Output directories
 OUT_DIR = out
@@ -16,6 +16,10 @@ REPO_URL ?= https://raw.githubusercontent.com/agoodkind/elk-lxc-template
 REPO_BRANCH ?= main
 PROXMOX_REPO_URL ?= https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main
 PROXMOX_LOCAL_PATH ?= /root/ProxmoxVE
+
+# Deploy configuration
+SSH_TARGET ?=
+DEPLOY_PATH ?= /root/elk-stack.sh
 
 # Help is the interactive default
 .DEFAULT_GOAL := help
@@ -40,6 +44,18 @@ installer-local: export LOCAL_MODE=true
 installer-local: dirs
 installer-local: $(CT_DIR)/elk-stack.sh
 
+# Deploy to SSH target
+.PHONY: deploy
+deploy: installer-local
+	@if [ -z "$(SSH_TARGET)" ]; then \
+		echo "Error: SSH_TARGET not set"; \
+		echo "Usage: make deploy SSH_TARGET=user@host"; \
+		exit 1; \
+	fi
+	@echo "Deploying $(CT_DIR)/elk-stack.sh to $(SSH_TARGET):$(DEPLOY_PATH)..."
+	@scp $(CT_DIR)/elk-stack.sh $(SSH_TARGET):$(DEPLOY_PATH)
+	@echo "✓ Deployed successfully"
+
 # Create output directories
 .PHONY: dirs
 dirs:
@@ -57,6 +73,9 @@ help:
 	@echo "  make installer-local        Build for local testing (hybrid mode)"
 	@echo "  make template               Build LXC template"
 	@echo ""
+	@echo "Deploy Targets:"
+	@echo "  make deploy                 Build and deploy to SSH target"
+	@echo ""
 	@echo "Test Targets:"
 	@echo "  make test                   Run comprehensive test suite"
 	@echo "  make test-quick             Quick syntax validation"
@@ -68,10 +87,15 @@ help:
 	@echo "  PROXMOX_REPO_URL=<url>      ProxmoxVE repo URL (default: community-scripts/ProxmoxVE)"
 	@echo "  PROXMOX_LOCAL_PATH=<path>   Local ProxmoxVE path (default: /root/ProxmoxVE)"
 	@echo ""
+	@echo "Deploy Configuration:"
+	@echo "  SSH_TARGET=<user@host>      SSH destination for deploy (required)"
+	@echo "  DEPLOY_PATH=<path>          Remote path (default: /root/elk-stack.sh)"
+	@echo ""
 	@echo "Examples:"
 	@echo "  make installer                                    # Production build"
 	@echo "  make installer REPO_BRANCH=dev                    # Test dev branch"
 	@echo "  make installer-local PROXMOX_LOCAL_PATH=/custom   # Local testing"
+	@echo "  make deploy SSH_TARGET=root@proxmox.local         # Deploy to server"
 	@echo ""
 	@echo "Runtime Configuration (during installation):"
 	@echo "  - SSL/TLS options (Full HTTPS/Backend only/No SSL)"
