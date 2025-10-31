@@ -58,11 +58,10 @@ fi
 
 echo -e "${INFO}${YW} Credentials: ${GATEWAY}${BGN}pct exec $CTID -- cat /root/elk-credentials.txt${CL}"
 echo -e "${INFO}${YW} Kibana:      ${GATEWAY}${BGN}http://${IP}:5601${CL}"
-echo -e "${INFO}${YW} Logs:        ${GATEWAY}${BGN}pct exec $CTID -- cat /tmp/elk-install.log${CL}"
 echo
-echo -e "${INFO}${YW} Logstash Ingestion:${CL}"
+echo -e "${INFO}${YW} A default pipeline and data view have been created for you:${CL}"
 echo "  HTTP Endpoint: http://${IP}:8080"
-echo "  Send logs via HTTP POST with JSON body"
+echo "  You can send logs via HTTP POST with JSON body"
 echo "  Example:"
 echo "    curl -X POST http://${IP}:8080 \\"
 echo "      -H \"Content-Type: application/json\" \\"
@@ -70,21 +69,21 @@ echo "      -d '{\"message\":\"test\",\"level\":\"info\"}'"
 echo "  Data Stream: logs-generic-default"
 echo "  View logs in Kibana > Discover > \"Generic Logs\" data view"
 echo
-echo -e "${INFO}${YW} Instructions to turn on HTTPS:${CL}"
-echo
-echo "1. Put your own certificate and key in /etc/kibana/certs/ca.crt and /etc/kibana/certs/ca.key"
-echo "2. Edit /etc/kibana/kibana.yml" and add the following:
-echo
-echo "  server.ssl.enabled: true"
-echo "  server.ssl.certificate: /etc/kibana/certs/ca.crt"
-echo "  server.ssl.key: /etc/kibana/certs/ca.key"
-echo "  server.port: 443 # (optional, default is 5601)"
-echo
-echo "3. Restart Kibana: pct exec $CTID -- systemctl restart kibana"
-echo
 # Users can add custom pipelines to /etc/logstash/conf.d/ after installation
 echo -e "${INFO}${YW} Put your custom pipelines in:${CL}"
 echo "  /etc/logstash/conf.d/"
+echo
+echo -e "${INFO}${YW} Instructions to turn on HTTPS:${CL}"
+echo
+echo "${TAB}1. Put your own certificate and key in /etc/kibana/certs/ca.crt and /etc/kibana/certs/ca.key"
+echo "${TAB}2. Edit /etc/kibana/kibana.yml" and add the following:
+echo
+echo "${TAB}${TAB}server.ssl.enabled: true"
+echo "${TAB}${TAB}server.ssl.certificate: /etc/kibana/certs/ca.crt"
+echo "${TAB}${TAB}server.ssl.key: /etc/kibana/certs/ca.key"
+echo "${TAB}${TAB}server.port: 443 # (optional, default is 5601)"
+echo
+echo "${TAB}3. Restart Kibana: pct exec $CTID -- systemctl restart kibana"
 echo
 echo -e "${INFO}${YW} Management Commands:${CL}"
 echo "  Reset password: pct exec $CTID -- /usr/share/elasticsearch/bin/elasticsearch-reset-password -u elastic"
