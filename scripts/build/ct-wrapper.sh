@@ -10,12 +10,12 @@
 # 2. Installing ELK Stack inside the container
 #
 # FLOW:
-#   build-installer.sh → out/install/elk-stack-install.sh
-#   build-ct-wrapper.sh → embeds installer → out/ct/elk-stack.sh
+#   installer.sh → out/install/elk-stack-install.sh (self-contained)
+#   ct-wrapper.sh → out/ct/elk-stack.sh (calls build_container())
 #
 # Two modes:
-#   - LOCAL_MODE=true:  Embeds everything (for testing/offline)
-#   - LOCAL_MODE=false: Downloads from GitHub (for production)
+#   - LOCAL_MODE=true:  Embeds everything (for local testing)
+#   - LOCAL_MODE=false: ProxmoxVE submission mode (relies on ProxmoxVE infrastructure)
 
 set -e
 
@@ -81,7 +81,7 @@ chmod +x "$OUT_FILE"
 
 echo ""
 echo "✓ Generated $OUT_FILE successfully"
-echo "  Mode: $([ "$LOCAL_MODE" = "true" ] && echo "Local/Embedded" || echo "Remote")"
+echo "  Mode: $([ "$LOCAL_MODE" = "true" ] && echo "Local/Embedded" || echo "ProxmoxVE submission")"
 echo "  Framework: $([ "$LOCAL_MODE" = "true" ] && echo "Embedded build.func" || echo "$PROXMOX_REPO_URL/misc/build.func")"
-echo "  Installer: $([ "$LOCAL_MODE" = "true" ] && echo "Embedded from $INSTALLER_FILE" || echo "$INSTALL_URL")"
+echo "  Installer: $([ "$LOCAL_MODE" = "true" ] && echo "Embedded from $INSTALLER_FILE" || echo "ProxmoxVE serves from install/elk-stack-install.sh")"
 
