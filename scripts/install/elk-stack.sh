@@ -241,10 +241,7 @@ step_done "Updated Package Lists"
 step_start "Installing ELK Stack (Elasticsearch, Logstash, Kibana)"
 log_info "  → Downloading packages (~3GB, may take 5-15 minutes)"
 
-APT_OPTS="-y"
-[ "${VERBOSE}" != "yes" ] && APT_OPTS="-qq -y"
-
-run_cmd "DEBIAN_FRONTEND=noninteractive apt-get install $APT_OPTS elasticsearch logstash kibana" || {
+run_cmd "DEBIAN_FRONTEND=noninteractive apt-get install -qq -y elasticsearch logstash kibana" || {
     log_error "Failed to install ELK Stack packages"
     exit 1
 }
