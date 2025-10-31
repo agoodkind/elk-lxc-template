@@ -75,6 +75,13 @@ if ! command -v msg_ok &> /dev/null; then
     }
 fi
 
+# Display warning message
+if ! command -v msg_warn &> /dev/null; then
+    msg_warn() {
+        echo "⚠ $1" | tee -a "$LOG_FILE"
+    }
+fi
+
 # ============================================================================
 # STEP WRAPPER FUNCTIONS
 # ============================================================================
@@ -785,11 +792,11 @@ step_done "Started Services"
 step_start "Creating Kibana Data View"
 msg_verbose "  → Waiting for Kibana to be ready..."
 
-MAX_WAIT=60
+MAX_WAIT=90
 WAITED=0
 while [ $WAITED -lt $MAX_WAIT ]; do
     if curl -s -k -u "elastic:$ELASTIC_PASSWORD" "http://localhost:5601/api/status" | grep -q "available"; then
-        msg_debug "Kibana is ready after ${WAITED}s"
+        msg_debug "Kibana status available after ${WAITED}s"
         break
     fi
     sleep 2
@@ -799,26 +806,41 @@ done
 if [ $WAITED -ge $MAX_WAIT ]; then
     msg_warn "Kibana did not become ready in time, skipping data view creation"
 else
+    msg_verbose "  → Waiting for Kibana to fully initialize..."
+    sleep 10
+    
     msg_verbose "  → Creating data view for logs-generic-default..."
     
-    DATAVIEW_RESPONSE=$(curl -s -k -u "elastic:$ELASTIC_PASSWORD" \
-        -X POST "http://localhost:5601/api/data_views/data_view" \
-        -H "kbn-xsrf: true" \
-        -H "Content-Type: application/json" \
-        -d '{
-            "data_view": {
-                "title": "logs-generic-*",
-                "name": "Generic Logs",
-                "timeFieldName": "@timestamp"
-            }
-        }' 2>&1)
+    DATAVIEW_CREATED=false
+    for attempt in 1 2 3; do
+        DATAVIEW_RESPONSE=$(curl -s -k -u "elastic:$ELASTIC_PASSWORD" \
+            -X POST "http://localhost:5601/api/data_views/data_view" \
+            -H "kbn-xsrf: true" \
+            -H "Content-Type: application/json" \
+            -d '{
+                "data_view": {
+                    "title": "logs-generic-*",
+                    "name": "Generic Logs",
+                    "timeFieldName": "@timestamp"
+                }
+            }' 2>&1)
+        
+        msg_debug "Data view response (attempt $attempt): $DATAVIEW_RESPONSE"
+        
+        if echo "$DATAVIEW_RESPONSE" | grep -q "data_view"; then
+            msg_verbose "  ✓ Data view created successfully"
+            DATAVIEW_CREATED=true
+            break
+        elif echo "$DATAVIEW_RESPONSE" | grep -q "not ready"; then
+            msg_debug "Kibana not ready, waiting 5s before retry..."
+            sleep 5
+        else
+            break
+        fi
+    done
     
-    msg_debug "Data view response: $DATAVIEW_RESPONSE"
-    
-    if echo "$DATAVIEW_RESPONSE" | grep -q "data_view"; then
-        msg_verbose "  ✓ Data view created successfully"
-    else
-        msg_warn "Data view may already exist or creation failed"
+    if [ "$DATAVIEW_CREATED" = false ]; then
+        msg_warn "Data view creation failed or already exists"
     fi
 fi
 
@@ -830,14 +852,27 @@ step_done "Created Kibana Data View"
 step_start "Testing Log Ingestion"
 msg_verbose "  → Waiting for Logstash to be ready..."
 
-sleep 5
+MAX_LOGSTASH_WAIT=30
+LOGSTASH_WAITED=0
+while [ $LOGSTASH_WAITED -lt $MAX_LOGSTASH_WAIT ]; do
+    if netstat -tln | grep -q ":8080 "; then
+        msg_debug "Logstash HTTP input ready after ${LOGSTASH_WAITED}s"
+        break
+    fi
+    sleep 2
+    LOGSTASH_WAITED=$((LOGSTASH_WAITED + 2))
+done
 
-msg_verbose "  → Sending test log to Logstash..."
-TEST_MESSAGE="ELK Stack installation test log at $(date '+%Y-%m-%d %H:%M:%S')"
+if [ $LOGSTASH_WAITED -ge $MAX_LOGSTASH_WAIT ]; then
+    msg_warn "Logstash HTTP input not ready, skipping ingestion test"
+    step_done "Skipped Log Ingestion Test"
+else
+    msg_verbose "  → Sending test log to Logstash..."
+    TEST_MESSAGE="ELK Stack installation test log at $(date '+%Y-%m-%d %H:%M:%S')"
 
-POST_RESPONSE=$(curl -s -X POST "http://localhost:8080" \
-    -H "Content-Type: application/json" \
-    -d "$(cat <<EOF
+    POST_RESPONSE=$(curl -s -X POST "http://localhost:8080" \
+        -H "Content-Type: application/json" \
+        -d "$(cat <<EOF
 {
     "message": "$TEST_MESSAGE",
     "level": "info",
@@ -846,16 +881,16 @@ POST_RESPONSE=$(curl -s -X POST "http://localhost:8080" \
 EOF
 )" 2>&1)
 
-msg_debug "POST response: $POST_RESPONSE"
+    msg_debug "POST response: $POST_RESPONSE"
 
-msg_verbose "  → Waiting for log to be indexed..."
-sleep 3
+    msg_verbose "  → Waiting for log to be indexed..."
+    sleep 10
 
-msg_verbose "  → Querying Elasticsearch for test log..."
-SEARCH_RESPONSE=$(curl -s -k -u "elastic:$ELASTIC_PASSWORD" \
-    -X GET "https://localhost:9200/logs-generic-default/_search" \
-    -H "Content-Type: application/json" \
-    -d "$(cat <<EOF
+    msg_verbose "  → Querying Elasticsearch for test log..."
+    SEARCH_RESPONSE=$(curl -s -k -u "elastic:$ELASTIC_PASSWORD" \
+        -X GET "https://localhost:9200/logs-generic-default/_search" \
+        -H "Content-Type: application/json" \
+        -d "$(cat <<EOF
 {
     "query": {
         "match_phrase": {
@@ -867,15 +902,17 @@ SEARCH_RESPONSE=$(curl -s -k -u "elastic:$ELASTIC_PASSWORD" \
 EOF
 )" 2>&1)
 
-msg_debug "Search response: $SEARCH_RESPONSE"
+    msg_debug "Search response: $SEARCH_RESPONSE"
 
-if echo "$SEARCH_RESPONSE" | jq -r '.hits.total.value' | grep -qE '^[1-9][0-9]*$'; then
-    msg_verbose "  ✓ Test log successfully ingested and indexed"
-else
-    msg_warn "Test log not found in Elasticsearch (may need more time to index)"
+    if echo "$SEARCH_RESPONSE" | jq -r '.hits.total.value' | grep -qE '^[1-9][0-9]*$'; then
+        msg_verbose "  ✓ Test log successfully ingested and indexed"
+    else
+        msg_warn "Test log not found in Elasticsearch (may need more time to index)"
+        msg_debug "Check Logstash logs: tail -f /var/log/logstash/logstash-plain.log"
+    fi
+
+    step_done "Tested Log Ingestion"
 fi
-
-step_done "Tested Log Ingestion"
 
 # ============================================================================
 # INSTALLATION COMPLETE
@@ -885,8 +922,8 @@ msg_ok "Completed Successfully!"
 msg_debug "tail -n 100 /var/log/elasticsearch/elasticsearch.log"
 msg_debug "$(tail -n 100 /var/log/elasticsearch/elasticsearch.log)"
 msg_debug "--------------------------------"
-msg_debug "tail -n 100 /var/log/logstash/logstash.log"
-msg_debug "$(tail -n 100 /var/log/logstash/logstash.log)"
+msg_debug "tail -n 100 /var/log/logstash/logstash-plain.log"
+msg_debug "$(tail -n 100 /var/log/logstash/logstash-plain.log)"
 msg_debug "--------------------------------"
 msg_debug "tail -n 100 /var/log/kibana/kibana.log"
 msg_debug "$(tail -n 100 /var/log/kibana/kibana.log)"
