@@ -110,7 +110,12 @@ msg_debug() {
         local output=""
         
         if [ -n "$file" ] && [ -f "$file" ]; then
-            local file_content=$(grep -v "^#" "$file" | grep -v "^$" | head -20 | sed 's/^/DEBUG      /' || echo "DEBUG      (empty or all comments)")
+            # Extract non-comment, non-empty lines
+            local file_content=$(grep -v "^#" "$file" | \
+                grep -v "^$" | \
+                head -20 | \
+                sed 's/^/DEBUG      /' || \
+                echo "DEBUG      (empty or all comments)")
             output=$(echo -e "DEBUG: $msg\n---\n$file_content")
         elif [ -n "$file" ]; then
             output="DEBUG: $msg (file $file doesn't exist)"
@@ -232,7 +237,7 @@ step_start "Installing Dependencies"
 if ! DEBIAN_FRONTEND=noninteractive apt-get install -qq -y \
     wget gnupg apt-transport-https ca-certificates \
     openjdk-11-jre-headless curl unzip openssl \
-    htop net-tools vim; then
+    htop net-tools vim jq; then
     msg_error "Failed to install dependencies"
     exit 1
 fi
@@ -499,7 +504,6 @@ msg_verbose "  → Auto-generating password for elastic user..."
 
 # Use auto-generate mode (-a) with batch mode (-b) to avoid password echo
 RESET_OUTPUT=$(/usr/share/elasticsearch/bin/elasticsearch-reset-password -u elastic -a -b 2>&1)
-msg_debug "Reset output: $RESET_OUTPUT"
 
 if [ $? -ne 0 ]; then
     msg_error "Failed to reset elastic user password"
@@ -599,8 +603,25 @@ step_done "Configured Kibana"
 # Create Logstash API Key
 # ----------------------------------------------------------------------------
 step_start "Creating Logstash API Key"
-msg_verbose "  → Defining Logstash writer role with permissions for logs-*, logstash-*, ecs-*"
-LOGSTASH_ROLE='{"name":"logstash_writer","role_descriptors":{"logstash_writer":{"cluster":["monitor","manage_index_templates","manage_ilm"],"indices":[{"names":["logs-*","logstash-*","ecs-*"],"privileges":["write","create","create_index","manage","manage_ilm","auto_configure"]}]}}}'
+msg_verbose "  → Defining Logstash writer role permissions for all indices"
+LOGSTASH_ROLE=$(cat <<'EOF'
+{
+  "name": "logstash_writer",
+  "role_descriptors": {
+    "logstash_writer": {
+      "cluster": ["monitor", "manage_index_templates", "manage_ilm"],
+      "indices": [{
+        "names": ["*"],
+        "privileges": [
+          "read", "write", "create", "create_index",
+          "delete", "manage", "manage_ilm", "auto_configure"
+        ]
+      }]
+    }
+  }
+}
+EOF
+)
 msg_verbose "  → Creating API key via Elasticsearch API..."
 msg_verbose "  → Endpoint: $ES_URL/_security/api_key"
 
@@ -612,7 +633,12 @@ LOGSTASH_KEY_RESPONSE=$(curl $CURL_OPTS -s -X POST \
 
 msg_debug "Logstash key response: $LOGSTASH_KEY_RESPONSE"
 
-LOGSTASH_API_KEY=$(echo "$LOGSTASH_KEY_RESPONSE" | grep -o '"encoded":"[^"]*' | cut -d'"' -f4)
+# Extract ID and API key from JSON response
+LOGSTASH_ID=$(echo "$LOGSTASH_KEY_RESPONSE" | jq -r '.id')
+LOGSTASH_KEY=$(echo "$LOGSTASH_KEY_RESPONSE" | jq -r '.api_key')
+
+# Combine as id:api_key format
+LOGSTASH_API_KEY="${LOGSTASH_ID}:${LOGSTASH_KEY}"
 
 if [ -z "$LOGSTASH_API_KEY" ]; then
     msg_error "Failed to extract API key from Elasticsearch response"
@@ -649,6 +675,35 @@ step_done "Configured Logstash Keystore"
 # ----------------------------------------------------------------------------
 # Configure Logstash Output
 # ----------------------------------------------------------------------------
+step_start "Configuring Logstash Input"
+cat > /etc/logstash/conf.d/10-input.conf << 'EOF'
+
+# Logstash input configuration (HTTP POST)
+input {
+	http {
+		port => 8080
+		codec => json
+	}
+}
+EOF
+step_done "Configured Logstash Input"
+
+step_start "Configuring Logstash Filter"
+cat > /etc/logstash/conf.d/20-filter.conf << 'EOF'
+
+# Logstash filter configuration (pass through verbatim with data_stream fields)
+filter {
+	mutate {
+		add_field => {
+			"[data_stream][type]" => "logs"
+			"[data_stream][dataset]" => "generic"
+			"[data_stream][namespace]" => "default"
+		}
+	}
+}
+EOF
+step_done "Configured Logstash Filter"
+
 step_start "Configuring Logstash Output"
 cat > /etc/logstash/conf.d/30-output.conf << 'EOF'
 
@@ -686,6 +741,16 @@ Kibana URL: $KIBANA_URL
 Username: elastic
 Password: $ELASTIC_PASSWORD
 
+Logstash Ingestion:
+- HTTP Endpoint: http://$(hostname -I | awk '{print $1}'):8080
+- Send logs via HTTP POST with JSON body
+- Example:
+  curl -X POST http://$(hostname -I | awk '{print $1}'):8080 \\
+    -H "Content-Type: application/json" \\
+    -d '{"message":"test","level":"info"}'
+- Data Stream: logs-generic-default
+- View logs in Kibana > Discover > "Generic Logs" data view
+
 Security Notes:
 - SSL/HTTPS enabled (auto-configured by Elasticsearch)
 - Self-signed certificates (suitable for internal use)
@@ -714,10 +779,118 @@ if [ "$VERBOSE" = "yes" ]; then
 fi
 step_done "Started Services"
 
+# ----------------------------------------------------------------------------
+# Create Kibana Data View
+# ----------------------------------------------------------------------------
+step_start "Creating Kibana Data View"
+msg_verbose "  → Waiting for Kibana to be ready..."
+
+MAX_WAIT=60
+WAITED=0
+while [ $WAITED -lt $MAX_WAIT ]; do
+    if curl -s -k -u "elastic:$ELASTIC_PASSWORD" "http://localhost:5601/api/status" | grep -q "available"; then
+        msg_debug "Kibana is ready after ${WAITED}s"
+        break
+    fi
+    sleep 2
+    WAITED=$((WAITED + 2))
+done
+
+if [ $WAITED -ge $MAX_WAIT ]; then
+    msg_warn "Kibana did not become ready in time, skipping data view creation"
+else
+    msg_verbose "  → Creating data view for logs-generic-default..."
+    
+    DATAVIEW_RESPONSE=$(curl -s -k -u "elastic:$ELASTIC_PASSWORD" \
+        -X POST "http://localhost:5601/api/data_views/data_view" \
+        -H "kbn-xsrf: true" \
+        -H "Content-Type: application/json" \
+        -d '{
+            "data_view": {
+                "title": "logs-generic-*",
+                "name": "Generic Logs",
+                "timeFieldName": "@timestamp"
+            }
+        }' 2>&1)
+    
+    msg_debug "Data view response: $DATAVIEW_RESPONSE"
+    
+    if echo "$DATAVIEW_RESPONSE" | grep -q "data_view"; then
+        msg_verbose "  ✓ Data view created successfully"
+    else
+        msg_warn "Data view may already exist or creation failed"
+    fi
+fi
+
+step_done "Created Kibana Data View"
+
+# ----------------------------------------------------------------------------
+# Test Log Ingestion
+# ----------------------------------------------------------------------------
+step_start "Testing Log Ingestion"
+msg_verbose "  → Waiting for Logstash to be ready..."
+
+sleep 5
+
+msg_verbose "  → Sending test log to Logstash..."
+TEST_MESSAGE="ELK Stack installation test log at $(date '+%Y-%m-%d %H:%M:%S')"
+
+POST_RESPONSE=$(curl -s -X POST "http://localhost:8080" \
+    -H "Content-Type: application/json" \
+    -d "$(cat <<EOF
+{
+    "message": "$TEST_MESSAGE",
+    "level": "info",
+    "source": "elk-installer"
+}
+EOF
+)" 2>&1)
+
+msg_debug "POST response: $POST_RESPONSE"
+
+msg_verbose "  → Waiting for log to be indexed..."
+sleep 3
+
+msg_verbose "  → Querying Elasticsearch for test log..."
+SEARCH_RESPONSE=$(curl -s -k -u "elastic:$ELASTIC_PASSWORD" \
+    -X GET "https://localhost:9200/logs-generic-default/_search" \
+    -H "Content-Type: application/json" \
+    -d "$(cat <<EOF
+{
+    "query": {
+        "match_phrase": {
+            "message": "$TEST_MESSAGE"
+        }
+    },
+    "size": 1
+}
+EOF
+)" 2>&1)
+
+msg_debug "Search response: $SEARCH_RESPONSE"
+
+if echo "$SEARCH_RESPONSE" | jq -r '.hits.total.value' | grep -qE '^[1-9][0-9]*$'; then
+    msg_verbose "  ✓ Test log successfully ingested and indexed"
+else
+    msg_warn "Test log not found in Elasticsearch (may need more time to index)"
+fi
+
+step_done "Tested Log Ingestion"
+
 # ============================================================================
 # INSTALLATION COMPLETE
 # ============================================================================
 msg_ok "Completed Successfully!"
+
+msg_debug "tail -n 100 /var/log/elasticsearch/elasticsearch.log"
+msg_debug "$(tail -n 100 /var/log/elasticsearch/elasticsearch.log)"
+msg_debug "--------------------------------"
+msg_debug "tail -n 100 /var/log/logstash/logstash.log"
+msg_debug "$(tail -n 100 /var/log/logstash/logstash.log)"
+msg_debug "--------------------------------"
+msg_debug "tail -n 100 /var/log/kibana/kibana.log"
+msg_debug "$(tail -n 100 /var/log/kibana/kibana.log)"
+msg_debug "--------------------------------"
 
 # Write final log message
 echo "" | tee -a "$LOG_FILE"
