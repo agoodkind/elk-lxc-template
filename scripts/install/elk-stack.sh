@@ -50,7 +50,6 @@ LOG_FILE="${LOG_FILE:-/tmp/elk-install.log}"
 if [ ! -f "$LOG_FILE" ]; then
     echo "$(date '+%Y-%m-%d %H:%M:%S') - \
 Starting ELK Stack installation" | tee "$LOG_FILE"
-    echo "Installation log: $LOG_FILE" | tee -a "$LOG_FILE"
 fi
 
 # ============================================================================
@@ -280,11 +279,18 @@ step_done "Updated Package Lists"
 # Install ELK Stack Packages
 # ----------------------------------------------------------------------------
 step_start "Installing ELK Stack (Elasticsearch, Logstash, Kibana)"
-msg_verbose "  → Downloading packages (~2GB, may take 5-15 minutes)..."
+msg_info "  → Downloading packages (~3GB, may take 5-15 minutes)..."
 # Install all three ELK components
-if ! DEBIAN_FRONTEND=noninteractive apt-get install -qq -y elasticsearch logstash kibana ; then
-    msg_error "Failed to install ELK Stack packages"
-    exit 1
+if [ "${DEBUG}" = "yes" ]; then
+    if ! DEBIAN_FRONTEND=noninteractive apt-get install -y elasticsearch logstash kibana ; then
+        msg_error "Failed to install ELK Stack packages"
+        exit 1
+    fi
+else
+    if ! DEBIAN_FRONTEND=noninteractive apt-get install -qq -y elasticsearch logstash kibana > /dev/null 2>&1 ; then
+        msg_error "Failed to install ELK Stack packages"
+        exit 1
+    fi
 fi
 step_done "Installed ELK Stack (Elasticsearch, Logstash, Kibana)"
 
